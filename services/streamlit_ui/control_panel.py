@@ -1,4 +1,4 @@
-"""
+﻿"""
 MLOps Control Panel
 ====================
 Service health, pipeline triggers, inline DAG logs, model deployment.
@@ -361,7 +361,7 @@ def _badge(state: str) -> str:
 def _log_panel(dag_id: str, run_id: str, ss_key: str, refresh_key: str, clear_key: str):
     """
     Renders the right-hand log panel for a single DAG run.
-    Manual refresh only — no auto-refresh.
+    Manual refresh only - no auto-refresh.
     """
     if not run_id:
         st.markdown('<div class="log-idle">No active run</div>', unsafe_allow_html=True)
@@ -402,7 +402,7 @@ def _log_panel(dag_id: str, run_id: str, ss_key: str, refresh_key: str, clear_ke
 
     lbl = f"`{task_id}` (try {try_num})"
     if t_state == "running":
-        lbl += " — running"
+        lbl += " - running"
 
     with st.expander(lbl, expanded=False):
         st.code(log_text, language="text")
@@ -468,7 +468,7 @@ def _multi_log_panel(dag_configs: list[tuple[str, str, str]], refresh_key: str, 
 
         lbl = f"`{task_id}` (try {try_num})"
         if t_state == "running":
-            lbl += " — running"
+            lbl += " - running"
 
         raw = fetch_task_log(dag_id, run_id, task_id, try_num)
         with st.expander(lbl, expanded=False):
@@ -492,7 +492,7 @@ def _render_dag_log_expander(dag_id: str, run_id: str, label: str = "View Logs",
                 "task":     t.get("task_id"),
                 "state":    f"{STATE_ICON.get(s, '❓')} {s}",
                 "start":    (t.get("start_date") or "")[:19],
-                "duration": f"{dur:.1f}s" if dur else "—",
+                "duration": f"{dur:.1f}s" if dur else "-",
                 "try":      t.get("try_number", 1),
             })
         st.dataframe(pd.DataFrame(task_rows), width="stretch", hide_index=True)
@@ -508,7 +508,7 @@ def _render_dag_log_expander(dag_id: str, run_id: str, label: str = "View Logs",
 
 
 # ═══════════════════════════════════════════════════════════════════
-# PAGE — Header
+# PAGE - Header
 # ═══════════════════════════════════════════════════════════════════
 
 col_title, col_links = st.columns([4, 1])
@@ -547,11 +547,11 @@ stats = get_platform_stats(_prod_primary_metric)
 if stats:
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Total Runs",        stats["total_runs"])
-    s2.metric("Current Run Index", stats["latest_run"] or "—")
-    s3.metric("Total Records",     f"{stats['total_records']:,}" if stats["total_records"] else "—")
+    s2.metric("Current Run Index", stats["latest_run"] or "-")
+    s3.metric("Total Records",     f"{stats['total_records']:,}" if stats["total_records"] else "-")
     _pm_label = f"Latest {stats.get('primary_metric_display', 'ROC-AUC')}"
     _pm_val   = stats.get("latest_primary_metric")
-    s4.metric(_pm_label, f"{_pm_val:.4f}" if _pm_val is not None else "—")
+    s4.metric(_pm_label, f"{_pm_val:.4f}" if _pm_val is not None else "-")
 
 cr, _ = st.columns([1, 5])
 if cr.button("↻ Refresh", width="stretch"):
@@ -567,7 +567,7 @@ tab_pipe, tab_deploy, tab_challenger = st.tabs(["🔄  Pipelines", "🚀  Deploy
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — Pipelines
+# TAB 1 - Pipelines
 # ════════════════════════════════════════════════════════════════════════════
 with tab_pipe:
 
@@ -617,7 +617,7 @@ with tab_pipe:
 
             available_runs = get_available_run_indices()
             if not available_runs:
-                st.warning("No inference runs yet — run Batch Inference first.")
+                st.warning("No inference runs yet - run Batch Inference first.")
                 mon_run_index = None
             else:
                 mon_run_index = st.selectbox(
@@ -686,7 +686,7 @@ with tab_pipe:
     if not run_history.empty:
         st.dataframe(
             run_history.style.format({"drift_factor": "{:.2f}", "records": "{:,.0f}"},
-                                     na_rep="—"),
+                                     na_rep="-"),
             width="stretch", hide_index=True,
         )
     else:
@@ -695,7 +695,7 @@ with tab_pipe:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Deploy Model
+# TAB 2 - Deploy Model
 # ════════════════════════════════════════════════════════════════════════════
 with tab_deploy:
 
@@ -713,7 +713,7 @@ with tab_deploy:
                 model_name_input = MODEL_NAME
             else:
                 labels = {
-                    f"v{v.version}  [{v.tags.get('stage','—')}]  run:{v.run_id[:8]}": v.version
+                    f"v{v.version}  [{v.tags.get('stage','-')}]  run:{v.run_id[:8]}": v.version
                     for v in versions
                 }
                 selected_label   = st.selectbox("Model version", list(labels.keys()), key="dep_ver")
@@ -723,7 +723,7 @@ with tab_deploy:
 
                 st.json({
                     "version":   selected_obj.version,
-                    "stage_tag": selected_obj.tags.get("stage", "—"),
+                    "stage_tag": selected_obj.tags.get("stage", "-"),
                     "run_id":    selected_obj.run_id,
                     "created":   str(selected_obj.creation_timestamp),
                 }, expanded=False)
@@ -733,9 +733,9 @@ with tab_deploy:
             st.subheader("Currently Serving")
             try:
                 info = requests.get(f"{FLASK_ENDPOINT}/model-info", timeout=5).json()
-                st.metric("Version", f"v{info.get('model_version', '—')}")
+                st.metric("Version", f"v{info.get('model_version', '-')}")
                 st.metric("Alias",   info.get("model_alias", "production"))
-                st.caption(f"Run ID: `{info.get('run_id','—')[:24]}…`")
+                st.caption(f"Run ID: `{info.get('run_id','-')[:24]}…`")
             except Exception:
                 st.error("Flask API unreachable")
 
@@ -762,7 +762,7 @@ with tab_deploy:
                     lines.append(f"[1/3] Archived previous production v{prev.version}")
                     log_ph.code("\n".join(lines))
             except Exception:
-                lines.append("[1/3] No previous production alias — first deploy")
+                lines.append("[1/3] No previous production alias - first deploy")
                 log_ph.code("\n".join(lines))
 
             client.set_registered_model_alias(model_name_input, "production", str(selected_version))
@@ -778,7 +778,7 @@ with tab_deploy:
                     flask_err = resp.text[:300]
                 raise RuntimeError(f"Flask /reload HTTP {resp.status_code}: {flask_err}")
             reload_info = resp.json()
-            lines.append(f"[3/3] Flask reloaded — serving v{reload_info.get('model_version')}")
+            lines.append(f"[3/3] Flask reloaded - serving v{reload_info.get('model_version')}")
             log_ph.code("\n".join(lines))
 
             st.success(f"✅  v{selected_version} is live in Production!")
@@ -794,7 +794,7 @@ with tab_deploy:
     if versions:
         tbl = [{
             "version":   v.version,
-            "stage_tag": v.tags.get("stage", "—"),
+            "stage_tag": v.tags.get("stage", "-"),
             "run_id":    v.run_id[:20] + "…",
             "created":   str(v.creation_timestamp),
         } for v in versions]
@@ -802,7 +802,7 @@ with tab_deploy:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 3 — Challenger Model
+# TAB 3 - Challenger Model
 # ════════════════════════════════════════════════════════════════════════════
 with tab_challenger:
 
@@ -825,7 +825,7 @@ with tab_challenger:
             if challenger_run_id.strip():
                 st.info(f"Primary metric: **{_metric_display}** (from MLflow run tag)")
             else:
-                st.caption(f"Primary metric: **{_metric_display}** (default — enter run ID to auto-detect)")
+                st.caption(f"Primary metric: **{_metric_display}** (default - enter run ID to auto-detect)")
 
             force_deploy = st.checkbox(
                 "Force Deploy (promote even if challenger loses)",
@@ -834,7 +834,7 @@ with tab_challenger:
             )
 
             if force_deploy:
-                st.warning(f"⚠ Force Deploy enabled — challenger will be promoted regardless of {REGISTRY[chal_primary_metric]} comparison.")
+                st.warning(f"⚠ Force Deploy enabled - challenger will be promoted regardless of {REGISTRY[chal_primary_metric]} comparison.")
 
             trigger_disabled = not challenger_run_id.strip()
             if st.button(
@@ -901,7 +901,7 @@ with tab_challenger:
                     if prod_std is not None:
                         st.caption(f"std ± {prod_std:.4f}  ({cv_folds} folds)")
                 else:
-                    st.metric(f"Avg {metric_label}", "—")
+                    st.metric(f"Avg {metric_label}", "-")
 
             with col_vs:
                 st.markdown("<br><br><div style='text-align:center;font-size:1.4rem'>vs</div>",
@@ -915,7 +915,7 @@ with tab_challenger:
                     if chal_std is not None:
                         st.caption(f"std ± {chal_std:.4f}  ({cv_folds} folds)")
                 else:
-                    st.metric(f"Avg {metric_label}", "—")
+                    st.metric(f"Avg {metric_label}", "-")
 
             with col_verdict:
                 st.markdown("<br>", unsafe_allow_html=True)

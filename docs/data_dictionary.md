@@ -1,4 +1,4 @@
-# Data Dictionary
+﻿# Data Dictionary
 
 ## Schema: `dwh_raw`
 
@@ -9,7 +9,7 @@ One row per generated loan application. Timestamps are set 1 day in the past to 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
 | `record_id` | UUID | NO | Primary key. Auto-generated UUID. |
-| `customer_id` | VARCHAR(36) | NO | Deterministic UUID5 — one of 10,000 synthetic customer identifiers, stable across runs. |
+| `customer_id` | VARCHAR(36) | NO | Deterministic UUID5 - one of 10,000 synthetic customer identifiers, stable across runs. |
 | `age` | INT | NO | Applicant age in years. Range: [18, 75]. |
 | `annual_income` | FLOAT | NO | Annual income in USD. LogNormal(μ=11, σ=0.5) → ~$60k median. |
 | `credit_score` | INT | NO | FICO-style credit score. Range: [300, 850]. Normal(680, 50) baseline. |
@@ -120,7 +120,7 @@ Audit trail of every retraining event triggered by the pipeline.
 
 ### Table: `results`
 
-One row per batch run evaluation. Unique constraint on `run_index` — re-running monitoring for the same run_index overwrites via upsert.
+One row per batch run evaluation. Unique constraint on `run_index` - re-running monitoring for the same run_index overwrites via upsert.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -192,7 +192,7 @@ One row per record per batch run. Enables the Dashboard waterfall view.
 |---|---|---|---|
 | `id` | UUID | NO | Primary key. |
 | `run_index` | INT | NO | FK → dwh_monitoring_shap.results.run_index. |
-| `customer_id` | VARCHAR(36) | YES | Deterministic UUID5 — stable across runs for the same customer. |
+| `customer_id` | VARCHAR(36) | YES | Deterministic UUID5 - stable across runs for the same customer. |
 | `record_id` | UUID | YES | FK → dwh_clean.cleaned_features.record_id. |
 | `shap_values` | JSONB | YES | `{"feature_name": shap_value, ...}` for this record. |
 | `base_value` | FLOAT | YES | Model's expected output (log-odds baseline). |
@@ -255,7 +255,7 @@ Per-record prediction output. Written in parallel with `dwh_history.prediction_g
 Derived as `loan_amount / annual_income`. High DTI (> 0.5) is the strongest predictor of default in the simulation. Clipped to [0, 5].
 
 ### `home_ownership_encoded`
-Ordinal encoding: RENT=0, MORTGAGE=1, OWN=2, OTHER=3. Reflects housing stability as a crude ordinal — the model learns the true relationship from data.
+Ordinal encoding: RENT=0, MORTGAGE=1, OWN=2, OTHER=3. Reflects housing stability as a crude ordinal - the model learns the true relationship from data.
 
 ### `payment_history_score`
 Scored 0–100. Generated from Beta(5, 2) × 100, so most applicants cluster around 70–90. Lower values strongly predict default.
@@ -264,4 +264,4 @@ Scored 0–100. Generated from Beta(5, 2) × 100, so most applicants cluster aro
 Generated from a logistic function on: `credit_score` (−), `annual_income` (−), `loan_amount` (+), `debt_to_income_ratio` (+), `payment_history_score` (−), `employment_length_years` (−). Random noise added. Expected default rate ~25–30% in stable mode (class imbalance ~1:2.6 non-default to default).
 
 ### `customer_id`
-`uuid.uuid5(NAMESPACE, pool_key)` where `pool_key` is drawn from a fixed pool of 10,000 synthetic IDs. This makes customer_id deterministic and stable — the same logical customer appears in multiple batch runs, enabling longitudinal SHAP analysis.
+`uuid.uuid5(NAMESPACE, pool_key)` where `pool_key` is drawn from a fixed pool of 10,000 synthetic IDs. This makes customer_id deterministic and stable - the same logical customer appears in multiple batch runs, enabling longitudinal SHAP analysis.

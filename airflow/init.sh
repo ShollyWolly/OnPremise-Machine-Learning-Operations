@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # =============================================================================
 # Platform Init Script
 # =============================================================================
 # Runs once at startup (via platform-init container).
-# Idempotent — safe to run on repeated docker compose up.
+# Idempotent - safe to run on repeated docker compose up.
 #
 # Steps:
 #   1. Migrate Airflow DB
@@ -30,8 +30,8 @@ airflow db migrate
 echo "      Done."
 
 echo "[1b] Creating Airflow pools..."
-airflow pools set training_pool 1 "Dedicated slot for model retraining — prevents resource contention" \
-    2>&1 || echo "      Pool already exists — continuing."
+airflow pools set training_pool 1 "Dedicated slot for model retraining - prevents resource contention" \
+    2>&1 || echo "      Pool already exists - continuing."
 echo "      Done."
 
 echo "[1c] Deduplicating monitoring tables (keep latest row per run_index)..."
@@ -77,12 +77,12 @@ airflow users create \
     --role Admin \
     --email "${AIRFLOW_ADMIN_EMAIL:-admin@mlops.local}" \
     --password "${AIRFLOW_ADMIN_PASSWORD:-admin}" \
-    2>&1 || echo "      User may already exist — continuing."
+    2>&1 || echo "      User may already exist - continuing."
 
 # ---------------------------------------------------------------------------
-# 3. Volume permissions — handled by volume-init service (runs as root)
+# 3. Volume permissions - handled by volume-init service (runs as root)
 # ---------------------------------------------------------------------------
-echo "[3/5] Volume permissions pre-set by volume-init — skipping."
+echo "[3/5] Volume permissions pre-set by volume-init - skipping."
 
 # ---------------------------------------------------------------------------
 # 4. Wait for MLflow
@@ -117,9 +117,9 @@ except Exception:
 " 2>/dev/null)
 
 if [ "$HAS_MODEL" = "yes" ]; then
-    echo "      Production model found — skipping bootstrap."
+    echo "      Production model found - skipping bootstrap."
 else
-    echo "      No Production model found — running bootstrap..."
+    echo "      No Production model found - running bootstrap..."
     echo ""
 
     echo "  [5a] Generating initial training data (3000 stable records)..."

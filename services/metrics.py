@@ -1,15 +1,15 @@
-"""
+﻿"""
 Shared metric catalogue for the MLOps platform.
 
 All metrics take (y_true, y_score) where:
-  y_true  — ground truth labels (0/1 int array)
-  y_score — predicted probabilities [0, 1] (continuous float array)
-  y_pred  — optional pre-thresholded predictions; computed from y_score+threshold if None
+  y_true  - ground truth labels (0/1 int array)
+  y_score - predicted probabilities [0, 1] (continuous float array)
+  y_pred  - optional pre-thresholded predictions; computed from y_score+threshold if None
 
 Adding a new metric:
   1. Add key → display name to REGISTRY
   2. Add computation in compute_all_metrics()
-  3. That's it — DAG comparison, monitoring, and UI pick it up automatically.
+  3. That's it - DAG comparison, monitoring, and UI pick it up automatically.
 """
 
 from __future__ import annotations

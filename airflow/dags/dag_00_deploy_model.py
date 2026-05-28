@@ -1,5 +1,5 @@
-"""
-DAG 00 — Deploy Model
+﻿"""
+DAG 00 - Deploy Model
 ======================
 Manually triggered from Airflow UI. Assigns the 'production' alias to a model
 version in the MLflow registry and hot-reloads the Flask serving API.
@@ -138,7 +138,7 @@ with DAG(
     reload_flask = PythonOperator(
         task_id="reload_flask_api",
         python_callable=_reload_flask_api,
-        doc_md="POSTs to /reload — Flask reloads the new Production model in-process.",
+        doc_md="POSTs to /reload - Flask reloads the new Production model in-process.",
     )
 
     verify = PythonOperator(

@@ -1,10 +1,12 @@
-"""
+﻿"""
 Model Evaluation Helpers
 ========================
 
 Used by train.py and the retraining DAG to assess model quality
 before promoting to Production.
 """
+
+from __future__ import annotations
 
 import logging
 import os
@@ -64,5 +66,5 @@ def passes_promotion_gate(metrics: dict, baseline_metrics: dict | None = None) -
     passed = not bool(reasons)
     reason_str = "All gates passed" if passed else "; ".join(reasons)
 
-    log.info("Promotion gate: passed=%s — %s", passed, reason_str)
+    log.info("Promotion gate: passed=%s - %s", passed, reason_str)
     return passed, reason_str

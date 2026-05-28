@@ -1,5 +1,5 @@
-"""
-DAG 03 — Batch Inference (self-contained, manually triggerable)
+﻿"""
+DAG 03 - Batch Inference (self-contained, manually triggerable)
 ================================================================
 Fully self-contained pipeline: generates data, processes it, runs inference,
 then cascades to hard-metrics monitoring.
@@ -8,8 +8,8 @@ Can be triggered as many times as desired from the Airflow UI.
 Each run gets a unique sequential run_index from dwh_history.run_registry.
 
 Params (set when triggering from UI):
-  drift_factor: float [0.0–1.0] — covariate shift applied to generated data
-  n_records:    int             — number of records to generate per run
+  drift_factor: float [0.0–1.0] - covariate shift applied to generated data
+  n_records:    int             - number of records to generate per run
 
 Tasks:
   register_run        → INSERT into run_registry, get run_index (SERIAL)

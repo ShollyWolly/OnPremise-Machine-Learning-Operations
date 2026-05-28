@@ -1,11 +1,11 @@
-"""
-MLOps Credit Risk — Flask Model Serving API
+﻿"""
+MLOps Credit Risk - Flask Model Serving API
 ============================================
 
 Endpoints:
-    GET  /health       — liveness probe
-    GET  /model-info   — metadata about the currently loaded model
-    POST /predict      — single or batch prediction
+    GET  /health       - liveness probe
+    GET  /model-info   - metadata about the currently loaded model
+    POST /predict      - single or batch prediction
 
     POST /predict payload (JSON):
         {
@@ -126,7 +126,7 @@ def predict():
 
     # pyfunc models can return probabilities or class labels depending on flavor.
     # For sklearn classifiers logged with mlflow.sklearn, predict returns classes.
-    # We need probabilities — re-run through the underlying model if needed.
+    # We need probabilities - re-run through the underlying model if needed.
     if hasattr(model._model_impl, "predict_proba"):
         proba = model._model_impl.predict_proba(df[FEATURE_COLUMNS])[:, 1]
     else:

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Distribution parameters for synthetic loan application data generation.
 
 STABLE_PARAMS defines the baseline (no drift) distributions.
@@ -94,7 +94,7 @@ DRIFT_DELTAS = {
 }
 
 # Logistic regression coefficients used to derive default_flag from features.
-# These are fixed (stable across modes) — only covariate drift, not concept drift.
+# These are fixed (stable across modes) - only covariate drift, not concept drift.
 # Coefficients are intentionally strong so the synthetic data produces clear
 # class separation (theoretical AUC ~0.85+), ensuring the model comfortably
 # exceeds the promotion threshold (MIN_ROC_AUC) on every stable inference run.

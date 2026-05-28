@@ -1,4 +1,4 @@
-"""
+﻿"""
 Synthetic Loan Application Data Generator
 ==========================================
 
@@ -17,6 +17,8 @@ Arguments:
     --no-db         skip writing to PostgreSQL (parquet only)
     --no-parquet    skip writing parquet (DB only)
 """
+
+from __future__ import annotations
 
 import argparse
 import logging
@@ -148,12 +150,12 @@ def generate_records(n: int, drift_factor: float = 0.0, seed: int | None = None)
             log_odds = log_odds + coef * df[feat].astype(float)
 
     prob = 1.0 / (1.0 + np.exp(-log_odds))
-    # Tiny perturbation — keeps labels stochastic without degrading signal
+    # Tiny perturbation - keeps labels stochastic without degrading signal
     noise = rng.normal(0, 0.002, n)
     prob_noisy = np.clip(prob + noise, 0.0, 1.0)
     df["default_flag"] = (rng.random(n) < prob_noisy).astype(int)
 
-    # IDs and timestamps — ground truth immediately available for infinite demo
+    # IDs and timestamps - ground truth immediately available for infinite demo
     now = datetime.utcnow()
 
     _CUST_NS = uuid.UUID("12345678-1234-5678-1234-567812345678")

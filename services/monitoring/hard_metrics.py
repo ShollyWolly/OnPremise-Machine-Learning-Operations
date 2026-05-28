@@ -1,4 +1,4 @@
-"""
+﻿"""
 Monitoring Module 1: Hard Metrics
 ===================================
 Reads predictions + ground truth from dwh_history.prediction_ground_truth.
@@ -93,11 +93,11 @@ def get_primary_metric_from_registry(model_version: str) -> str:
         mv = client.get_model_version(MODEL_NAME, str(model_version))
         tag = mv.tags.get("primary_metric", DEFAULT_PRIMARY)
         if tag not in REGISTRY:
-            log.warning("Unknown primary_metric tag '%s' — falling back to %s", tag, DEFAULT_PRIMARY)
+            log.warning("Unknown primary_metric tag '%s' - falling back to %s", tag, DEFAULT_PRIMARY)
             return DEFAULT_PRIMARY
         return tag
     except Exception as exc:
-        log.warning("Could not read primary_metric from registry: %s — using %s", exc, DEFAULT_PRIMARY)
+        log.warning("Could not read primary_metric from registry: %s - using %s", exc, DEFAULT_PRIMARY)
         return DEFAULT_PRIMARY
 
 

@@ -1,5 +1,5 @@
-"""
-DAG 05 — Retraining Pipeline
+﻿"""
+DAG 05 - Retraining Pipeline
 ==============================
 
 Triggered by dag_04_monitoring (or manually).
@@ -7,7 +7,7 @@ Retrains the model on fresh data, evaluates it against the current production
 model, and promotes it to Production if it passes the quality gate.
 On success, the Flask API is restarted to load the new model.
 
-This DAG is NOT on a schedule — it is event-driven.
+This DAG is NOT on a schedule - it is event-driven.
 
 Tasks:
   validate_data_available → checks dwh_clean has enough records

@@ -1,12 +1,12 @@
-"""
+﻿"""
 Stage 2: Data Cleaning
 ======================
 
 Applies to the raw ingested DataFrame:
-  1. Imputation  — median for numeric, mode for categorical
-  2. Encoding    — OrdinalEncoder for home_ownership
-  3. Outlier removal — IQR-based on loan_amount and annual_income
-  4. Validation  — assert no nulls, check value ranges
+  1. Imputation  - median for numeric, mode for categorical
+  2. Encoding    - OrdinalEncoder for home_ownership
+  3. Outlier removal - IQR-based on loan_amount and annual_income
+  4. Validation  - assert no nulls, check value ranges
 
 Returns a cleaned DataFrame compatible with dwh_clean.cleaned_features schema.
 """

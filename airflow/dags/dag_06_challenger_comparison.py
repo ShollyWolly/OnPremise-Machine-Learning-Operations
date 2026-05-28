@@ -1,5 +1,5 @@
-"""
-DAG 06 — Challenger Model Comparison
+﻿"""
+DAG 06 - Challenger Model Comparison
 ======================================
 
 Compares a prototype/challenger model (identified by an MLflow run_id) against
@@ -10,9 +10,9 @@ The comparison always runs (for transparency/logging). The force_deploy flag
 controls whether promotion happens regardless of outcome.
 
 Conf keys:
-  challenger_run_id  (str, required) — MLflow run_id with a model logged under model/
-  force_deploy       (bool, default false) — promote even if challenger loses
-  primary_metric     (str, default "roc_auc") — metric used for comparison
+  challenger_run_id  (str, required) - MLflow run_id with a model logged under model/
+  force_deploy       (bool, default false) - promote even if challenger loses
+  primary_metric     (str, default "roc_auc") - metric used for comparison
                      one of: roc_auc, pr_auc, f1, precision, recall, accuracy
 
 Tasks:
@@ -85,7 +85,7 @@ def _load_and_score(ti, **context):
     challenger_model = mlflow.pyfunc.load_model(f"runs:/{challenger_run_id}/model")
     print(f"Challenger model loaded from run {challenger_run_id}")
 
-    # Fetch eval data — two-stage fallback for resilience on fresh stacks
+    # Fetch eval data - two-stage fallback for resilience on fresh stacks
     conn = psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "postgres"),
         port=int(os.getenv("POSTGRES_PORT", 5432)),
@@ -111,9 +111,9 @@ def _load_and_score(ti, **context):
 
     data_source = "prediction_ground_truth"
 
-    # Stage 2: no batch inference at all — fall back to cleaned_features holdout
+    # Stage 2: no batch inference at all - fall back to cleaned_features holdout
     if eval_df.empty:
-        print("No prediction_ground_truth rows found — falling back to cleaned_features holdout split")
+        print("No prediction_ground_truth rows found - falling back to cleaned_features holdout split")
         stage2_query = f"""
             SELECT {", ".join(FEATURE_COLUMNS)}, default_flag AS actual_default_flag
             FROM dwh_clean.cleaned_features
@@ -125,7 +125,7 @@ def _load_and_score(ti, **context):
 
         if full_df.empty:
             conn.close()
-            raise ValueError("No training data in cleaned_features — cannot evaluate models")
+            raise ValueError("No training data in cleaned_features - cannot evaluate models")
 
         # Use last 20% as holdout (same ordering as training: ORDER BY created_at)
         holdout_start = int(len(full_df) * 0.8)
@@ -455,7 +455,7 @@ with DAG(
 
     skip_promotion = EmptyOperator(
         task_id="skip_promotion",
-        doc_md="Challenger did not win and force_deploy=False — production unchanged.",
+        doc_md="Challenger did not win and force_deploy=False - production unchanged.",
     )
 
     log_comparison = PythonOperator(

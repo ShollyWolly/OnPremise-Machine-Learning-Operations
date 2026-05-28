@@ -1,4 +1,4 @@
-"""
+﻿"""
 Monitoring Module 3: SHAP Explainability
 ==========================================
 Computes SHAP values for the current batch using the Production model.
@@ -160,7 +160,7 @@ def _make_beeswarm_plot(shap_result: dict, run_index: int) -> str:
         show=False,
         max_display=10,
     )
-    plt.title(f"SHAP Summary (Beeswarm) — Run {run_index:05d}")
+    plt.title(f"SHAP Summary (Beeswarm) - Run {run_index:05d}")
     plt.tight_layout()
     tmp = tempfile.NamedTemporaryFile(suffix="_beeswarm.png", delete=False)
     plt.savefig(tmp.name, dpi=150, bbox_inches="tight")
@@ -175,7 +175,7 @@ def _make_bar_chart(shap_result: dict, run_index: int) -> str:
     vals = [v for _, v in sorted_items]
     ax.barh(feats[::-1], vals[::-1], color="steelblue")
     ax.set_xlabel("Mean |SHAP value|")
-    ax.set_title(f"Feature Importance (SHAP) — Run {run_index:05d}")
+    ax.set_title(f"Feature Importance (SHAP) - Run {run_index:05d}")
     plt.tight_layout()
     tmp = tempfile.NamedTemporaryFile(suffix="_bar.png", delete=False)
     fig.savefig(tmp.name, dpi=150)

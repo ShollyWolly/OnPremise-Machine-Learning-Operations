@@ -1,5 +1,5 @@
--- =============================================================================
--- MLOps Platform — PostgreSQL Initialization Script
+﻿-- =============================================================================
+-- MLOps Platform - PostgreSQL Initialization Script
 -- Creates database, schemas, and tables for all platform components.
 -- =============================================================================
 

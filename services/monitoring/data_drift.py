@@ -11,6 +11,8 @@ Usage:
     python data_drift.py --batch-run-id <uuid>
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

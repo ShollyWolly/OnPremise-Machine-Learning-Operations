@@ -1,12 +1,12 @@
-"""
-MLOps Platform — Control Panel
+﻿"""
+MLOps Platform - Control Panel
 ================================
 
 Tabs:
-  Deploy Model    — promote MLflow model version + reload Flask
-  Batch Inference — full self-contained pipeline via dag_03_batch_inference
-  Monitor         — trigger dag_04a/04b/04c for any run index
-  DAG Logs        — view recent DAG run status and task logs
+  Deploy Model    - promote MLflow model version + reload Flask
+  Batch Inference - full self-contained pipeline via dag_03_batch_inference
+  Monitor         - trigger dag_04a/04b/04c for any run index
+  DAG Logs        - view recent DAG run status and task logs
 """
 
 import json
@@ -225,7 +225,7 @@ st.set_page_config(
 st.title("MLOps Control Panel")
 
 # ---------------------------------------------------------------------------
-# Sidebar — platform status
+# Sidebar - platform status
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("Platform Status")
@@ -291,7 +291,7 @@ tab_deploy, tab_infer, tab_monitor, tab_logs = st.tabs(
 
 
 # ============================================================================
-# Tab 1 — Deploy Model
+# Tab 1 - Deploy Model
 # ============================================================================
 with tab_deploy:
     st.header("Deploy Model to Production")
@@ -304,7 +304,7 @@ with tab_deploy:
         versions = get_mlflow_versions()
         if versions:
             labels = {
-                f"v{v.version}  [tag:{v.tags.get('stage', 'unset')}]  —  run {v.run_id[:8]}": v.version
+                f"v{v.version}  [tag:{v.tags.get('stage', 'unset')}]  -  run {v.run_id[:8]}": v.version
                 for v in versions
             }
             selected_label = st.selectbox("Model version", list(labels.keys()))
@@ -320,9 +320,9 @@ with tab_deploy:
     with col_right:
         st.subheader("Current Production")
         if flask_info:
-            st.metric("Serving version", f"v{flask_info.get('model_version', '—')}")
+            st.metric("Serving version", f"v{flask_info.get('model_version', '-')}")
             st.metric("Alias", flask_info.get("model_alias", "production"))
-            st.caption(f"Run: {flask_info.get('run_id', '—')}")
+            st.caption(f"Run: {flask_info.get('run_id', '-')}")
         else:
             st.warning("Flask API not reachable")
 
@@ -388,7 +388,7 @@ with tab_deploy:
 
 
 # ============================================================================
-# Tab 2 — Batch Inference
+# Tab 2 - Batch Inference
 # ============================================================================
 with tab_infer:
     st.header("Run Batch Inference")
@@ -445,7 +445,7 @@ with tab_infer:
 
         state_colors = {"success": "✅", "failed": "❌", "running": "⏳", "queued": "🕐"}
         icon = state_colors.get(state, "❓")
-        st.info(f"{icon} DAG run `{run_id[:40]}…`  —  state: **{state}**")
+        st.info(f"{icon} DAG run `{run_id[:40]}…`  -  state: **{state}**")
 
         col_ref, col_clr = st.columns([1, 1])
         if col_ref.button("↻ Refresh", key="infer_refresh"):
@@ -464,8 +464,8 @@ with tab_infer:
                 latest = df_hist.iloc[0]
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Run Index", int(latest["run_index"]))
-                c2.metric("Records", f"{latest.get('n_records', '—'):,}" if latest.get('n_records') else "—")
-                c3.metric("Model Version", f"v{latest.get('model_version', '—')}")
+                c2.metric("Records", f"{latest.get('n_records', '-'):,}" if latest.get('n_records') else "-")
+                c3.metric("Model Version", f"v{latest.get('model_version', '-')}")
 
     st.divider()
     st.subheader("Inference Run History")
@@ -475,7 +475,7 @@ with tab_infer:
 
 
 # ============================================================================
-# Tab 3 — Monitor
+# Tab 3 - Monitor
 # ============================================================================
 with tab_monitor:
     st.header("Monitoring")
@@ -497,9 +497,9 @@ with tab_monitor:
 
     with col_ctrl:
         st.subheader("Modules")
-        do_hard = st.checkbox("Hard Metrics", value=True, help="dag_04a — ROC-AUC, F1, accuracy. Auto-triggers retraining if below threshold.")
-        do_drift = st.checkbox("Data Drift", help="dag_04b — Evidently covariate drift vs training reference. ~30s")
-        do_shap = st.checkbox("SHAP Explainability", help="dag_04c — SHAP TreeExplainer + per-customer values. ~60s")
+        do_hard = st.checkbox("Hard Metrics", value=True, help="dag_04a - ROC-AUC, F1, accuracy. Auto-triggers retraining if below threshold.")
+        do_drift = st.checkbox("Data Drift", help="dag_04b - Evidently covariate drift vs training reference. ~30s")
+        do_shap = st.checkbox("SHAP Explainability", help="dag_04c - SHAP TreeExplainer + per-customer values. ~60s")
 
         mon_btn = st.button(
             "Run Monitoring",
@@ -549,7 +549,7 @@ with tab_monitor:
             if run_id:
                 state = get_dag_run_state(dag_id, run_id)
                 icon = state_icons.get(state, "❓")
-                st.info(f"{icon} **{label}** — `{run_id[:40]}…` — **{state}**")
+                st.info(f"{icon} **{label}** - `{run_id[:40]}…` - **{state}**")
                 if state in ("queued", "running"):
                     still_running = True
 
@@ -569,7 +569,7 @@ with tab_monitor:
 
 
 # ============================================================================
-# Tab 4 — DAG Logs
+# Tab 4 - DAG Logs
 # ============================================================================
 with tab_logs:
     st.header("DAG Run Status & Logs")
@@ -637,7 +637,7 @@ with tab_logs:
                             "state": f"{icon} {state}",
                             "start_date": ti.get("start_date", ""),
                             "end_date": ti.get("end_date", ""),
-                            "duration": f"{ti.get('duration', 0):.1f}s" if ti.get("duration") else "—",
+                            "duration": f"{ti.get('duration', 0):.1f}s" if ti.get("duration") else "-",
                             "try_number": ti.get("try_number", 1),
                         })
                     st.dataframe(pd.DataFrame(task_table), use_container_width=True, hide_index=True)

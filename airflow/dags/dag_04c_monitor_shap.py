@@ -1,5 +1,5 @@
-"""
-DAG 04c — SHAP Explainability Monitoring
+﻿"""
+DAG 04c - SHAP Explainability Monitoring
 ==========================================
 Computes SHAP feature importances for the current batch using the Production
 model. Logs summary plots to MLflow. Writes per-feature importances to parquet
@@ -8,7 +8,7 @@ and dwh_monitoring_shap.results.
 Manually triggered from Airflow UI.
 
 Conf:
-  run_index: int or null — if null, uses latest run in dwh_history
+  run_index: int or null - if null, uses latest run in dwh_history
 
 Tasks:
   run_shap_explainability → shap_explainability.py

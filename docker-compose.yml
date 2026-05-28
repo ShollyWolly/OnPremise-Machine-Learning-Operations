@@ -1,15 +1,15 @@
-# =============================================================================
-# MLOps Platform — Docker Compose Stack
+﻿# =============================================================================
+# MLOps Platform - Docker Compose Stack
 #
 # Services:
-#   postgres          — PostgreSQL 15 (all schemas)
-#   mlflow            — MLflow tracking server + model registry (port 5000)
-#   platform-init     — One-shot bootstrap: Airflow DB, admin user, permissions,
+#   postgres          - PostgreSQL 15 (all schemas)
+#   mlflow            - MLflow tracking server + model registry (port 5000)
+#   platform-init     - One-shot bootstrap: Airflow DB, admin user, permissions,
 #                       initial training data + model if none exists
-#   airflow-webserver — Airflow UI (port 8080)
-#   airflow-scheduler — Airflow task scheduler
-#   flask-api         — Flask model serving (port 5001)
-#   streamlit-ui      — Control UI: deploy / generate / infer / monitor (port 8501)
+#   airflow-webserver - Airflow UI (port 8080)
+#   airflow-scheduler - Airflow task scheduler
+#   flask-api         - Flask model serving (port 5001)
+#   streamlit-ui      - Control UI: deploy / generate / infer / monitor (port 8501)
 #
 # Start: docker compose up -d
 # Logs:  docker compose logs -f <service>
@@ -69,7 +69,7 @@ x-airflow-common: &airflow-common
 
 services:
   # ---------------------------------------------------------------------------
-  # Volume Init — runs as root to create dirs and set permissions before
+  # Volume Init - runs as root to create dirs and set permissions before
   # platform-init (which runs as Airflow uid=50000) starts.
   # ---------------------------------------------------------------------------
   volume-init:
@@ -90,7 +90,7 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # PostgreSQL — primary relational store
+  # PostgreSQL - primary relational store
   # Schemas are created by init scripts on first start (fresh volume).
   # ---------------------------------------------------------------------------
   postgres:
@@ -116,7 +116,7 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # MLflow — experiment tracking + model registry
+  # MLflow - experiment tracking + model registry
   # ---------------------------------------------------------------------------
   mlflow:
     build:
@@ -150,7 +150,7 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # Platform Init — ONE-SHOT bootstrap container
+  # Platform Init - ONE-SHOT bootstrap container
   # Runs on every `docker compose up`; idempotent (skips steps already done).
   # Migrates Airflow DB, creates admin user, fixes permissions,
   # trains initial model if registry is empty.
@@ -181,7 +181,7 @@ services:
         condition: service_started
 
   # ---------------------------------------------------------------------------
-  # Airflow — orchestration
+  # Airflow - orchestration
   # ---------------------------------------------------------------------------
   airflow-webserver:
     <<: *airflow-common
@@ -215,9 +215,9 @@ services:
   # ---------------------------------------------------------------------------
   # Flask Model Serving API
   # Loads Production model from MLflow registry at startup.
-  # POST /predict — batch prediction
-  # GET  /health  — liveness probe
-  # POST /reload  — hot-swap to latest Production model
+  # POST /predict - batch prediction
+  # GET  /health  - liveness probe
+  # POST /reload  - hot-swap to latest Production model
   # ---------------------------------------------------------------------------
   flask-api:
     build:
@@ -250,7 +250,7 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # Streamlit Control Panel — deploy / inference / monitor triggers / DAG logs
+  # Streamlit Control Panel - deploy / inference / monitor triggers / DAG logs
   # ---------------------------------------------------------------------------
   streamlit-ui:
     build:
@@ -301,7 +301,7 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # Streamlit Monitoring Dashboard — data drift, hard metrics, SHAP
+  # Streamlit Monitoring Dashboard - data drift, hard metrics, SHAP
   # ---------------------------------------------------------------------------
   streamlit-dashboard:
     build:
@@ -340,8 +340,8 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # JupyterLab — prototyping environment for challenger model development
-  # Access: http://localhost:8888 (no auth — internal network only)
+  # JupyterLab - prototyping environment for challenger model development
+  # Access: http://localhost:8888 (no auth - internal network only)
   # ---------------------------------------------------------------------------
   jupyter:
     build:
@@ -378,7 +378,7 @@ services:
 # =============================================================================
 # Named Volumes
 # =============================================================================
-# Volumes — bind-mounted to ./volumes/ (see .gitignore)
+# Volumes - bind-mounted to ./volumes/ (see .gitignore)
 # =============================================================================
 
 # =============================================================================

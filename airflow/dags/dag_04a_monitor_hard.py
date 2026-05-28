@@ -1,5 +1,5 @@
-"""
-DAG 04a — Hard Metrics Monitoring
+﻿"""
+DAG 04a - Hard Metrics Monitoring
 ====================================
 Computes classification metrics (accuracy, F1, precision, recall, ROC-AUC)
 for a specific inference run. Auto-cascades to retraining if ROC-AUC < threshold.
@@ -9,8 +9,8 @@ Also triggered by dag_05_retraining after a retrain (with skip_retrain_trigger=T
 Can be triggered manually from Airflow UI.
 
 Conf / Params:
-  run_index:            int or null — if null, uses latest run in DB
-  skip_retrain_trigger: bool — if True, never trigger dag_05 (post-retrain check)
+  run_index:            int or null - if null, uses latest run in DB
+  skip_retrain_trigger: bool - if True, never trigger dag_05 (post-retrain check)
 
 Tasks:
   run_hard_metrics  → hard_metrics.py
@@ -68,7 +68,7 @@ def _parse_hard_metrics(ti, **context):
 
     raw = ti.xcom_pull(task_ids="run_hard_metrics")
     if not raw:
-        print("No output from hard_metrics.py — no retraining triggered")
+        print("No output from hard_metrics.py - no retraining triggered")
         ti.xcom_push(key="retraining_triggered", value=False)
         ti.xcom_push(key="reason", value="no_output")
         return
@@ -90,7 +90,7 @@ def _decide_retrain(ti, **context):
     skip = conf.get("skip_retrain_trigger", False)
 
     if skip:
-        print("skip_retrain_trigger=True — skipping retraining cascade")
+        print("skip_retrain_trigger=True - skipping retraining cascade")
         return "no_retraining_needed"
 
     retrain = ti.xcom_pull(task_ids="parse_result", key="retraining_triggered")
@@ -145,7 +145,7 @@ with DAG(
 
     no_retrain = EmptyOperator(
         task_id="no_retraining_needed",
-        doc_md="Metrics within thresholds or skip flag set — no retraining.",
+        doc_md="Metrics within thresholds or skip flag set - no retraining.",
     )
 
     run_metrics >> parse_result >> decide >> [trigger_retraining, no_retrain]

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Stage 1: Raw Ingestion
 ======================
 
@@ -108,7 +108,7 @@ def ingest(raw_dir: str | None = None) -> pd.DataFrame:
         log.info("No new records to process.")
         return pd.DataFrame()
 
-    # Merge both sources; DB is authoritative — parquet fills in parquet filename
+    # Merge both sources; DB is authoritative - parquet fills in parquet filename
     if "source_parquet_file" not in db_df.columns:
         db_df["source_parquet_file"] = None
 

@@ -1,9 +1,9 @@
-# Environment — .env is intentionally committed with demo defaults
+# Environment - .env is intentionally committed with demo defaults
 # *.env.local contains machine-specific overrides and is NOT committed
 *.env.local
 .env
 
-# Docker volume data — bind-mounted to ./volumes/ (do not commit)
+# Docker volume data - bind-mounted to ./volumes/ (do not commit)
 volumes/airflow-logs/
 volumes/data-raw/
 volumes/data-processed/

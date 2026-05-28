@@ -1,5 +1,5 @@
-"""
-DAG 04b — Data Drift Monitoring
+﻿"""
+DAG 04b - Data Drift Monitoring
 =================================
 Computes covariate drift between the current batch and the Production model's
 reference training dataset (stored as MLflow artifact reference_data.parquet).
@@ -7,7 +7,7 @@ reference training dataset (stored as MLflow artifact reference_data.parquet).
 Manually triggered from Airflow UI whenever drift analysis is needed.
 
 Conf:
-  run_index: int or null — if null, uses latest run in dwh_history
+  run_index: int or null - if null, uses latest run in dwh_history
 
 Tasks:
   run_data_drift → data_drift.py

@@ -1,12 +1,12 @@
-"""
+﻿"""
 MLOps Monitoring Dashboard
 ============================
 Port 8502  |  Control Panel on :8501
 
 Tabs:
-  Data Drift      — feature distributions, KS stats, drift trends
-  Hard Metrics    — confusion matrix, ROC, PR, calibration, metric trends
-  Explainability  — SHAP beeswarm, bar, outcome-grouped impact, waterfall
+  Data Drift      - feature distributions, KS stats, drift trends
+  Hard Metrics    - confusion matrix, ROC, PR, calibration, metric trends
+  Explainability  - SHAP beeswarm, bar, outcome-grouped impact, waterfall
 """
 
 import json
@@ -94,7 +94,7 @@ FEATURE_COLUMNS = [
     "debt_to_income_ratio", "num_credit_lines", "payment_history_score",
 ]
 
-# Color palette — consistent across all charts
+# Color palette - consistent across all charts
 PALETTE = {
     "primary":   "#3b82f6",
     "success":   "#22c55e",
@@ -687,7 +687,7 @@ def make_shap_bar_fig(fi: dict) -> go.Figure:
     ))
     fig.update_layout(
         **_plotly_base(380),
-        title=dict(text="<b>Mean |SHAP| — Feature Importance</b>", font=dict(size=14)),
+        title=dict(text="<b>Mean |SHAP| - Feature Importance</b>", font=dict(size=14)),
         xaxis_title="Mean |SHAP value|",
         yaxis=dict(autorange=True),
     )
@@ -753,7 +753,7 @@ def make_beeswarm_figure(run_index: int) -> plt.Figure | None:
     X_df = pd.DataFrame(shap_matrix, columns=FEATURE_COLUMNS)
     plt.figure(figsize=(7, 5))
     shap.summary_plot(shap_matrix, X_df, feature_names=FEATURE_COLUMNS, show=False, max_display=10)
-    plt.title(f"SHAP Summary — Run {run_index}", fontsize=12, fontweight="bold")
+    plt.title(f"SHAP Summary - Run {run_index}", fontsize=12, fontweight="bold")
     plt.tight_layout()
     return plt.gcf()
 
@@ -896,8 +896,8 @@ if summary:
             h = summary.get("hard", {})
             primary_val = h.get("primary_value") or h.get("roc_auc")
             st.markdown("📈 **Hard Metrics**")
-            st.metric(_prod_primary_label, f"{primary_val:.4f}" if primary_val else "—")
-            st.caption(f"F1: {h.get('f1_score', 0):.4f}  ·  Run {h.get('run_index','—')}" if h else "No data")
+            st.metric(_prod_primary_label, f"{primary_val:.4f}" if primary_val else "-")
+            st.caption(f"F1: {h.get('f1_score', 0):.4f}  ·  Run {h.get('run_index','-')}" if h else "No data")
     with ov2:
         with st.container(border=True):
             d = summary.get("drift", {})
@@ -905,15 +905,15 @@ if summary:
             detected = d.get("drift_detected", False)
             badge = '<span class="badge-warn">⚠ Drift Detected</span>' if detected else '<span class="badge-ok">✓ No Drift</span>'
             st.markdown("📊 **Data Drift**")
-            st.metric("Drift Score", f"{ds:.4f}" if ds is not None else "—")
+            st.metric("Drift Score", f"{ds:.4f}" if ds is not None else "-")
             st.markdown(badge, unsafe_allow_html=True)
-            st.caption(f"Run {d.get('run_index','—')}" if d else "No data")
+            st.caption(f"Run {d.get('run_index','-')}" if d else "No data")
     with ov3:
         with st.container(border=True):
             s = summary.get("shap", {})
             st.markdown("🔍 **Explainability**")
-            st.metric("Top Feature", s.get("top_feature", "—") if s else "—")
-            st.caption(f"{s.get('n_records','—')} records  ·  Run {s.get('run_index','—')}" if s else "No data")
+            st.metric("Top Feature", s.get("top_feature", "-") if s else "-")
+            st.caption(f"{s.get('n_records','-')} records  ·  Run {s.get('run_index','-')}" if s else "No data")
 
 st.divider()
 
@@ -925,7 +925,7 @@ tab_drift, tab_hard, tab_shap = st.tabs(
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — Data Drift
+# TAB 1 - Data Drift
 # ════════════════════════════════════════════════════════════════════════════
 with tab_drift:
     drift_runs = get_drift_runs()
@@ -978,7 +978,7 @@ with tab_drift:
             ref_df  = get_reference_features()
 
         if ref_df is None:
-            st.info("Reference dataset not available from MLflow — showing current distribution only.")
+            st.info("Reference dataset not available from MLflow - showing current distribution only.")
 
         if not curr_df.empty:
             with st.expander("📋 Dataset Statistics", expanded=False):
@@ -990,13 +990,13 @@ with tab_drift:
                         row.update({"Ref Mean": f"{s['mean']:.3f}", "Ref Std": f"{s['std']:.3f}",
                                     "Ref Min": f"{s['min']:.3f}", "Ref Max": f"{s['max']:.3f}"})
                     else:
-                        row.update({"Ref Mean": "—", "Ref Std": "—", "Ref Min": "—", "Ref Max": "—"})
+                        row.update({"Ref Mean": "-", "Ref Std": "-", "Ref Min": "-", "Ref Max": "-"})
                     if feat in curr_df.columns:
                         s = curr_df[feat].describe()
                         row.update({"Curr Mean": f"{s['mean']:.3f}", "Curr Std": f"{s['std']:.3f}",
                                     "Curr Min": f"{s['min']:.3f}", "Curr Max": f"{s['max']:.3f}"})
                     else:
-                        row.update({"Curr Mean": "—", "Curr Std": "—", "Curr Min": "—", "Curr Max": "—"})
+                        row.update({"Curr Mean": "-", "Curr Std": "-", "Curr Min": "-", "Curr Max": "-"})
                     rows.append(row)
                 st.dataframe(pd.DataFrame(rows).set_index("Feature"), width="stretch")
 
@@ -1035,7 +1035,7 @@ with tab_drift:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Hard Metrics
+# TAB 2 - Hard Metrics
 # ════════════════════════════════════════════════════════════════════════════
 with tab_hard:
     hard_runs = get_hard_metric_runs()
@@ -1100,7 +1100,7 @@ with tab_hard:
                 display_label = f"★ {label}" if is_primary else label
                 col.metric(
                     display_label,
-                    f"{val:.4f}" if val is not None else "—",
+                    f"{val:.4f}" if val is not None else "-",
                     delta=_delta(db_key),
                 )
 
@@ -1114,7 +1114,7 @@ with tab_hard:
         if raw_df.empty:
             st.info(
                 "No raw prediction data for this run. "
-                "Ground truth is populated during batch inference — ensure the inference run completed."
+                "Ground truth is populated during batch inference - ensure the inference run completed."
             )
         else:
             y_true  = raw_df["actual_default_flag"].values.astype(int)
@@ -1146,7 +1146,7 @@ with tab_hard:
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 3 — Explainability
+# TAB 3 - Explainability
 # ════════════════════════════════════════════════════════════════════════════
 with tab_shap:
     shap_runs = get_shap_runs()
@@ -1167,8 +1167,8 @@ with tab_shap:
 
         if agg:
             ai1, ai2, ai3 = st.columns(3)
-            ai1.metric("Top Feature",   agg.get("top_feature", "—"))
-            ai2.metric("Explainer",     agg.get("explainer_type", "—"))
+            ai1.metric("Top Feature",   agg.get("top_feature", "-"))
+            ai2.metric("Explainer",     agg.get("explainer_type", "-"))
             ai3.metric("Records",       f"{agg.get('n_records', 0):,}")
 
         # ── Beeswarm + Bar ────────────────────────────────────────────────────────
@@ -1224,12 +1224,12 @@ with tab_shap:
             # Outcome count pills
             oc1, oc2, oc3, oc4 = st.columns(4)
             for col, label, color in [
-                (oc1, "TP — Correct Default",    PALETTE["TP"]),
-                (oc2, "FP — False Alarm",        PALETTE["FP"]),
-                (oc3, "TN — Correct Non-Default", PALETTE["TN"]),
-                (oc4, "FN — Missed Default",     PALETTE["FN"]),
+                (oc1, "TP - Correct Default",    PALETTE["TP"]),
+                (oc2, "FP - False Alarm",        PALETTE["FP"]),
+                (oc3, "TN - Correct Non-Default", PALETTE["TN"]),
+                (oc4, "FN - Missed Default",     PALETTE["FN"]),
             ]:
-                short = label.split(" — ")[0]
+                short = label.split(" - ")[0]
                 n = counts.get(short, 0)
                 col.markdown(
                     f'<div style="text-align:center;padding:0.5rem;background:{color}22;'
