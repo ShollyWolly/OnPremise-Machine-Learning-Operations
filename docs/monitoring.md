@@ -16,7 +16,7 @@ Three independent monitoring DAGs run against any completed batch inference run.
 
 ### Metrics Computed
 
-All six metrics are computed from `services/metrics.py` - the single source of truth shared across DAGs, monitoring scripts, and UIs.
+All six metrics are computed from `services/metrics.py`, the single source of truth shared across DAGs, monitoring scripts, and UIs.
 
 | Key | Display Name | Notes |
 |---|---|---|
@@ -35,12 +35,12 @@ Retraining triggers when: `primary_metric_score < MIN_ROC_AUC` (env var default:
 
 ### Ground Truth Timing
 
-The data generator sets `created_at = NOW() - 1 day`. Ground truth (`actual_default_flag`) is populated from `dwh_clean.cleaned_features` via a COALESCE join - since data is synthetic, it is immediately available. In a production deployment this would reflect a real outcome delay (e.g. loan repayment status known 30+ days later).
+The data generator sets `created_at = NOW() - 1 day`. Ground truth (`actual_default_flag`) is populated from `dwh_clean.cleaned_features` via a COALESCE join, since data is synthetic, it is immediately available. In a production deployment this would reflect a real outcome delay (e.g. loan repayment status known 30+ days later).
 
 ### Storage
 
-- `dwh_monitoring_hard.results` - one row per `run_index`, unique constraint
-- MLflow experiment `monitoring_hard` - all 6 metrics as MLflow metrics
+- `dwh_monitoring_hard.results`, one row per `run_index`, unique constraint
+- MLflow experiment `monitoring_hard`, all 6 metrics as MLflow metrics
 - `/data/monitoring/hard/run_NNNNN.parquet`
 
 ---
@@ -61,10 +61,10 @@ Kolmogorov-Smirnov test applied independently to each of the 10 model input feat
 
 | Score Range | Interpretation |
 |---|---|
-| 0.00 – 0.10 | No drift - monitor normally |
-| 0.10 – 0.20 | Mild drift - watch closely |
-| 0.20 – 0.40 | Moderate drift - consider retraining |
-| > 0.40 | Severe drift - investigate data source |
+| 0.00 – 0.10 | No drift, monitor normally |
+| 0.10 – 0.20 | Mild drift, watch closely |
+| 0.20 – 0.40 | Moderate drift, consider retraining |
+| > 0.40 | Severe drift, investigate data source |
 
 Threshold for flagging: `drift_score > MAX_DRIFT_SCORE` (env var default: 0.20)
 
@@ -80,7 +80,7 @@ Only covariate drift is simulated. The target relationship (what causes default)
 
 ### Storage
 
-- `dwh_monitoring_drift.results` - one row per `run_index`
+- `dwh_monitoring_drift.results`, one row per `run_index`
   - `drift_detected` BOOLEAN
   - `drift_score` FLOAT (fraction of drifted features)
   - `num_drifted_features` INT
@@ -98,7 +98,7 @@ Per-feature SHAP values for every record in the specified batch run.
 
 | Output | Description |
 |---|---|
-| `feature_importances` JSONB | Mean |SHAP| per feature - aggregate importance |
+| `feature_importances` JSONB | Mean |SHAP| per feature, aggregate importance |
 | `top_feature` TEXT | Feature with highest mean |SHAP| |
 | `customer_shap_values` | Per-record: full SHAP vector + base_value + predicted_probability |
 | MLflow artifact: beeswarm plot | Directional feature impact distribution |
@@ -106,8 +106,8 @@ Per-feature SHAP values for every record in the specified batch run.
 
 ### Explainer Selection
 
-1. `shap.TreeExplainer` - fast, exact; used for RandomForest and XGBoost
-2. `shap.KernelExplainer` - model-agnostic fallback; slower, samples background
+1. `shap.TreeExplainer`, fast, exact; used for RandomForest and XGBoost
+2. `shap.KernelExplainer`, model-agnostic fallback; slower, samples background
 
 ### Interpreting SHAP Values
 
@@ -116,20 +116,20 @@ Per-feature SHAP values for every record in the specified batch run.
 - **Mean |SHAP|** → overall importance regardless of direction
 
 Expected top features by importance (simulation):
-1. `debt_to_income_ratio` (positive - higher DTI = more default)
-2. `payment_history_score` (negative - lower score = more default)
-3. `credit_score` (negative - lower score = more default)
-4. `annual_income` (negative - lower income = more default)
+1. `debt_to_income_ratio` (positive, higher DTI = more default)
+2. `payment_history_score` (negative, lower score = more default)
+3. `credit_score` (negative, lower score = more default)
+4. `annual_income` (negative, lower income = more default)
 
 ### Customer Waterfall
 
-Each row in `dwh_monitoring_shap.customer_shap_values` contains a `customer_id` (deterministic UUID5, stable across runs). The Dashboard Explainability tab uses this to render a per-customer waterfall chart - select any customer_id to see exactly which features pushed their default probability up or down.
+Each row in `dwh_monitoring_shap.customer_shap_values` contains a `customer_id` (deterministic UUID5, stable across runs). The Dashboard Explainability tab uses this to render a per-customer waterfall chart, select any customer_id to see exactly which features pushed their default probability up or down.
 
 ### Storage
 
-- `dwh_monitoring_shap.results` - aggregate per run_index (`feature_importances` JSONB)
-- `dwh_monitoring_shap.customer_shap_values` - per-record SHAP vectors
-- MLflow experiment `monitoring_shap` - beeswarm + bar chart logged as artifacts
+- `dwh_monitoring_shap.results`, aggregate per run_index (`feature_importances` JSONB)
+- `dwh_monitoring_shap.customer_shap_values`, per-record SHAP vectors
+- MLflow experiment `monitoring_shap`, beeswarm + bar chart logged as artifacts
 - `/data/monitoring/shap/run_NNNNN.parquet`
 
 ---
@@ -144,7 +144,7 @@ retraining_triggered = primary_metric_score < MIN_ROC_AUC
 
 The primary metric is determined at runtime from the production model's `primary_metric` tag. This means a model optimised for F1 will retrain when F1 drops below the threshold, not when ROC-AUC drops.
 
-Drift alone does **not** trigger retraining directly - it is informational. Only hard metric degradation triggers dag_05 automatically.
+Drift alone does **not** trigger retraining directly, it is informational. Only hard metric degradation triggers dag_05 automatically.
 
 ### Threshold Tuning
 

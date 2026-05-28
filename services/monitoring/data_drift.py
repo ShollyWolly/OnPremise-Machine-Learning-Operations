@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -29,17 +30,17 @@ import psycopg2.extras
 from dotenv import load_dotenv
 from scipy.stats import ks_2samp
 
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from platform_config import FEATURE_COLUMNS, MONITORING_EXPERIMENT_DRIFT  # noqa: E402
+
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-DRIFT_MONITORING_EXPERIMENT = "monitoring_drift"
-
-FEATURE_COLUMNS = [
-    "age", "annual_income", "credit_score", "loan_amount",
-    "loan_term_months", "employment_length_years", "home_ownership_encoded",
-    "debt_to_income_ratio", "num_credit_lines", "payment_history_score",
-]
+DRIFT_MONITORING_EXPERIMENT = MONITORING_EXPERIMENT_DRIFT
 
 
 def _db_conn():

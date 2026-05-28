@@ -4,10 +4,12 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY model_serving/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY model_serving/ .
+COPY platform_config.py .
+COPY schema.py .
 
 # Match Airflow/MLflow UID so shared bind-mount artifacts are writable by all services
 RUN useradd -u 50000 -g 0 -m flask-user

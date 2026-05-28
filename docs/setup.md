@@ -46,7 +46,7 @@ docker compose up -d
   Ready when: all services show healthy/running  (~60–120 s on first run)
 ```
 
-**First-run bootstrap** (`platform-init`) trains an initial XGBoost model and assigns the `production` alias automatically - Flask and Streamlit are ready to use immediately after startup.
+**First-run bootstrap** (`platform-init`) trains an initial XGBoost model and assigns the `production` alias automatically, Flask and Streamlit are ready to use immediately after startup.
 
 ---
 
@@ -104,7 +104,7 @@ curl http://localhost:5001/model-info
 
 Go to `http://localhost:8501`
 
-**Pipelines tab → Batch Inference → Run** - this generates data, processes it, runs inference, and automatically triggers hard metric monitoring.
+**Pipelines tab → Batch Inference → Run**, this generates data, processes it, runs inference, and automatically triggers hard metric monitoring.
 
 ### 5. Open the Monitoring Dashboard
 
@@ -128,15 +128,15 @@ Or from Airflow UI (`http://localhost:8080`):
 
 ### Monitoring (dag_04a / 04b / 04c)
 
-From Control Panel → Monitor tab - trigger any combination of the three monitoring DAGs.
+From Control Panel → Monitor tab, trigger any combination of the three monitoring DAGs.
 
-Or from Airflow UI - trigger individually with `{"run_index": N}` (omit to use latest run).
+Or from Airflow UI, trigger individually with `{"run_index": N}` (omit to use latest run).
 
 ### Manual Retraining (dag_05)
 
 From Control Panel → Monitor tab → Manual Retraining button.
 
-Or from Airflow UI - trigger `dag_05_retraining` with no conf.
+Or from Airflow UI, trigger `dag_05_retraining` with no conf.
 
 ### Challenger Workflow (dag_06)
 
@@ -145,7 +145,7 @@ Or from Airflow UI - trigger `dag_05_retraining` with no conf.
 3. Train a model and log it to MLflow (follow the notebook cells)
 4. Copy the `run_id` printed at the end
 5. Open Control Panel → **Challenger** tab
-6. Paste the `run_id` - primary metric auto-detects from the MLflow tag
+6. Paste the `run_id`, primary metric auto-detects from the MLflow tag
 7. Optionally enable Force Deploy
 8. Click **Run Challenger Comparison**
 
@@ -182,7 +182,7 @@ docker compose down -v && docker compose up -d
 
 **Platform-init keeps restarting**: MLflow or Postgres not ready yet. Check `docker compose logs platform-init`. Usually resolves within 2 minutes on first run.
 
-**Flask API stuck in `unhealthy`**: No `production` alias in MLflow registry. This should not happen after bootstrap - check `docker compose logs platform-init` to see if bootstrap completed successfully.
+**Flask API stuck in `unhealthy`**: No `production` alias in MLflow registry. This should not happen after bootstrap, check `docker compose logs platform-init` to see if bootstrap completed successfully.
 
 **JupyterLab "File Load Error"**: The `.ipynb_checkpoints` directory may have wrong permissions if notebooks were executed via `docker exec`. Fix:
 ```bash

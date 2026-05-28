@@ -1,6 +1,6 @@
 ﻿# MLOps Platform
 
-A self-contained MLOps platform for credit-risk binary classification. Covers the full lifecycle: data generation, feature engineering, model training, serving, monitoring, and challenger comparison - all orchestrated through Apache Airflow and wired together with MLflow, PostgreSQL, and two Streamlit UIs.
+A self-contained MLOps platform for credit-risk binary classification. Covers the full lifecycle: data generation, feature engineering, model training, serving, monitoring, and challenger comparison, all orchestrated through Apache Airflow and wired together with MLflow, PostgreSQL, and two Streamlit UIs.
 
 ```bash
 docker compose up -d
@@ -103,7 +103,7 @@ stateDiagram-v2
 
 | Container | Image / Build | Role |
 |---|---|---|
-| `mlops-postgres` | `postgres:15` | Primary relational store - all schemas |
+| `mlops-postgres` | `postgres:15` | Primary relational store, all schemas |
 | `mlops-mlflow` | `./infrastructure/mlflow` | Experiment tracking + model registry |
 | `mlops-platform-init` | `./airflow` | One-shot bootstrap (idempotent) |
 | `mlops-airflow-webserver` | `./airflow` | Airflow UI |
@@ -125,7 +125,7 @@ All containers share the `mlops-net` bridge network and run as `uid=50000` on bi
 | `dag_03_batch_inference` | manual | `n_records`, `drift_factor` | Generate → process → `/predict` → write `dwh_history`, auto-triggers dag_04a |
 | `dag_04a_monitor_hard` | manual / auto | `run_index`, `skip_retrain_trigger` | Compute all 6 metrics, check primary metric threshold, trigger retraining |
 | `dag_04b_monitor_drift` | manual | `run_index` | KS drift test per feature vs training reference distribution |
-| `dag_04c_monitor_shap` | manual | `run_index` | SHAP explanations per customer - aggregate + per-record |
+| `dag_04c_monitor_shap` | manual | `run_index` | SHAP explanations per customer, aggregate + per-record |
 | `dag_05_retraining` | manual / auto | - | Hyperparameter search → train on all data → promote if quality gate passes |
 | `dag_06_challenger_comparison` | manual | `challenger_run_id`, `force_deploy` | StratifiedKFold CV comparison of challenger vs production, log to DB |
 
@@ -133,7 +133,7 @@ All containers share the `mlops-net` bridge network and run as `uid=50000` on bi
 
 ## Metrics
 
-All metrics are defined in `services/metrics.py` - single source of truth shared by DAGs, monitoring, and UIs.
+All metrics are defined in `services/metrics.py`, single source of truth shared by DAGs, monitoring, and UIs.
 
 | Key | Display | Notes |
 |---|---|---|
@@ -164,7 +164,7 @@ mlops (database)
 │   └── results
 ├── dwh_monitoring_drift      per-run feature drift results (KS test)
 │   └── results
-├── dwh_monitoring_shap       SHAP values - aggregate and per-customer
+├── dwh_monitoring_shap       SHAP values, aggregate and per-customer
 │   ├── results               feature_importances JSONB, top_feature
 │   └── customer_shap_values  per-record SHAP vectors + base_value
 ├── dwh_challenger            challenger comparison audit log
@@ -242,7 +242,7 @@ docker compose down -v && docker compose up -d
 3. Train a model, set `PRIMARY_METRIC`, log to MLflow
 4. Copy the printed `run_id`
 5. Open Control Panel → **Challenger** tab
-6. Paste `run_id` - primary metric auto-detects from the MLflow run tag
+6. Paste `run_id`, primary metric auto-detects from the MLflow run tag
 7. Optionally enable **Force Deploy** to promote regardless of comparison result
 8. Click **Run Challenger Comparison**
 9. Airflow runs a 5-fold stratified CV comparison and logs results to `dwh_challenger.comparison_log`
@@ -254,8 +254,8 @@ docker compose down -v && docker compose up -d
 | Notebook | Purpose |
 |---|---|
 | `01_challenger_template.ipynb` | Train a challenger model, log to MLflow, get `run_id` for the Control Panel |
-| `02_eda_and_feature_analysis.ipynb` | Explore the training dataset - distributions, correlations, default rates by segment, production prediction history |
-| `03_production_model_analysis.ipynb` | Audit the current production model - all metrics, ROC/PR/calibration curves, confusion matrix, SHAP importance, version history, metric trend |
+| `02_eda_and_feature_analysis.ipynb` | Explore the training dataset, distributions, correlations, default rates by segment, production prediction history |
+| `03_production_model_analysis.ipynb` | Audit the current production model, all metrics, ROC/PR/calibration curves, confusion matrix, SHAP importance, version history, metric trend |
 
 All notebooks connect to PostgreSQL and MLflow via environment variables pre-wired from `.env`.
 

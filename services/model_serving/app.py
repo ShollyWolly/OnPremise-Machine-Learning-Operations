@@ -45,12 +45,20 @@ Endpoints:
 
 import logging
 import os
+import sys
 
 import pandas as pd
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 
 from model_loader import load_model
+
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from platform_config import FEATURE_COLUMNS  # noqa: E402
+from schema import INFERENCE_FEATURE_SCHEMA  # noqa: E402
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -61,19 +69,6 @@ app = Flask(__name__)
 # Model loaded once at startup
 _model = None
 _version_info = None
-
-FEATURE_COLUMNS = [
-    "age",
-    "annual_income",
-    "credit_score",
-    "loan_amount",
-    "loan_term_months",
-    "employment_length_years",
-    "home_ownership_encoded",
-    "debt_to_income_ratio",
-    "num_credit_lines",
-    "payment_history_score",
-]
 
 
 def get_model():
@@ -115,6 +110,11 @@ def predict():
     missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
     if missing:
         return jsonify({"error": f"Missing feature columns: {missing}"}), 400
+
+    try:
+        INFERENCE_FEATURE_SCHEMA.validate(df[FEATURE_COLUMNS])
+    except Exception as exc:
+        return jsonify({"error": f"Input validation failed: {exc}"}), 422
 
     model, vi = get_model()
 

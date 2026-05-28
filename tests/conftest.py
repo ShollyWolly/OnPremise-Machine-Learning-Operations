@@ -7,12 +7,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
+_ROOT = Path(__file__).parent.parent
 # Make service modules importable without installing them
-sys.path.insert(0, str(Path(__file__).parent.parent / "services"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "services" / "data_generator"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "services" / "processing_pipeline"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "services" / "monitoring"))
-sys.path.insert(0, str(Path(__file__).parent.parent / "training"))
+for _p in [
+    _ROOT / "services",
+    _ROOT / "services" / "data_generator",
+    _ROOT / "services" / "processing_pipeline",
+    _ROOT / "services" / "monitoring",
+    _ROOT / "services" / "batch_inference",
+    _ROOT / "services" / "model_serving",
+    _ROOT / "training",
+]:
+    _ps = str(_p)
+    if _ps not in sys.path:
+        sys.path.insert(0, _ps)
 
 
 @pytest.fixture

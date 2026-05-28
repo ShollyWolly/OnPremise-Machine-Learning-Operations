@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -35,17 +36,17 @@ import psycopg2.extras
 import shap
 from dotenv import load_dotenv
 
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from platform_config import FEATURE_COLUMNS, MONITORING_EXPERIMENT_SHAP  # noqa: E402
+
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-MONITORING_EXPERIMENT = "monitoring_shap"
-
-FEATURE_COLUMNS = [
-    "age", "annual_income", "credit_score", "loan_amount",
-    "loan_term_months", "employment_length_years", "home_ownership_encoded",
-    "debt_to_income_ratio", "num_credit_lines", "payment_history_score",
-]
+MONITORING_EXPERIMENT = MONITORING_EXPERIMENT_SHAP
 
 
 def _db_conn():

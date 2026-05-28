@@ -3,7 +3,7 @@
 ## DAG Overview
 
 ```
-dag_00_deploy_model          (manual - promote any model version)
+dag_00_deploy_model          (manual, promote any model version)
 
 dag_03_batch_inference       (manual)
        │  auto-triggers on completion
@@ -14,19 +14,19 @@ dag_04a_monitor_hard         (event-driven + manual)
 dag_05_retraining            (event-driven + manual)
        │  post-retrain check
        ▼
-dag_04a_monitor_hard         (skip_retrain_trigger=True - verify new model)
+dag_04a_monitor_hard         (skip_retrain_trigger=True, verify new model)
 
-dag_04b_monitor_drift        (manual - independent of dag_04a)
-dag_04c_monitor_shap         (manual - independent of dag_04a)
+dag_04b_monitor_drift        (manual, independent of dag_04a)
+dag_04c_monitor_shap         (manual, independent of dag_04a)
 
-dag_06_challenger_comparison (manual - triggered from Control Panel Challenger tab)
+dag_06_challenger_comparison (manual, triggered from Control Panel Challenger tab)
 ```
 
 All DAGs can also be triggered from the Airflow UI or the Control Panel.
 
 ---
 
-## DAG 00 - Deploy Model
+## DAG 00, Deploy Model
 
 **File**: `airflow/dags/dag_00_deploy_model.py`  
 **Schedule**: None (manual)  
@@ -47,7 +47,7 @@ promote_to_stage  →  reload_flask_api  →  verify_deployment
 
 ---
 
-## DAG 03 - Batch Inference
+## DAG 03, Batch Inference
 
 **File**: `airflow/dags/dag_03_batch_inference.py`  
 **Schedule**: None (manual)  
@@ -66,19 +66,19 @@ register_run
     ↓
 generate_data    (generator.py --mode stable|drift --drift-factor N)
     ↓
-process_data     (pipeline.py - clean, encode, validate)
+process_data     (pipeline.py, clean, encode, validate)
     ↓
 check_flask_health
     ↓
-run_inference    (inference.py --run-index N - calls /predict, writes dwh_history)
+run_inference    (inference.py --run-index N, calls /predict, writes dwh_history)
     ↓
 trigger_monitoring  (TriggerDagRunOperator → dag_04a with run_index conf)
 ```
 
 ### Outputs
-- `dwh_history.run_registry` - one row, SERIAL `run_index`
-- `dwh_history.prediction_ground_truth` - one row per record, includes all features + score + `actual_default_flag`
-- `dwh_predictions.batch_predictions` - legacy copy, one row per record
+- `dwh_history.run_registry`, one row, SERIAL `run_index`
+- `dwh_history.prediction_ground_truth`, one row per record, includes all features + score + `actual_default_flag`
+- `dwh_predictions.batch_predictions`, legacy copy, one row per record
 - `/data/raw/*.parquet`, `/data/processed/*.parquet`, `/data/predictions/*.parquet`
 
 ### Failure Modes
@@ -87,7 +87,7 @@ trigger_monitoring  (TriggerDagRunOperator → dag_04a with run_index conf)
 
 ---
 
-## DAG 04a - Hard Metrics Monitor
+## DAG 04a, Hard Metrics Monitor
 
 **File**: `airflow/dags/dag_04a_monitor_hard.py`  
 **Schedule**: None (triggered by dag_03 and dag_05, or manually)  
@@ -121,13 +121,13 @@ Primary metric is read from the production model's MLflow tag (`primary_metric`)
 | `MIN_ROC_AUC` | `0.60` | Trigger retraining if primary metric score < this value |
 
 ### Outputs
-- `dwh_monitoring_hard.results` - all 6 metrics + `primary_metric` + `retraining_triggered`
+- `dwh_monitoring_hard.results`, all 6 metrics + `primary_metric` + `retraining_triggered`
 - MLflow experiment `monitoring_hard`
 - `/data/monitoring/hard/run_NNNNN.parquet`
 
 ---
 
-## DAG 04b - Data Drift Monitor
+## DAG 04b, Data Drift Monitor
 
 **File**: `airflow/dags/dag_04b_monitor_drift.py`  
 **Schedule**: None (manual)  
@@ -147,13 +147,13 @@ Primary metric is read from the production model's MLflow tag (`primary_metric`)
 5. `drift_detected = True` if `drift_score > MAX_DRIFT_SCORE`
 
 ### Outputs
-- `dwh_monitoring_drift.results` - `drift_detected`, `drift_score`, `num_drifted_features`, `drifted_feature_names`
+- `dwh_monitoring_drift.results`, `drift_detected`, `drift_score`, `num_drifted_features`, `drifted_feature_names`
 - MLflow experiment `monitoring_drift`
 - `/data/monitoring/drift/run_NNNNN.parquet`
 
 ---
 
-## DAG 04c - SHAP Explainability
+## DAG 04c, SHAP Explainability
 
 **File**: `airflow/dags/dag_04c_monitor_shap.py`  
 **Schedule**: None (manual)  
@@ -170,20 +170,20 @@ Primary metric is read from the production model's MLflow tag (`primary_metric`)
 
 ### Customer SHAP
 Each row in `customer_shap_values` contains:
-- `customer_id` - deterministic UUID5 (stable across runs for the same customer)
-- `shap_values` - JSONB: `{feature: shap_value, ...}` for that record
-- `base_value` - model's expected output (log-odds baseline)
-- `predicted_probability` - actual model output for this record
+- `customer_id`, deterministic UUID5 (stable across runs for the same customer)
+- `shap_values`, JSONB: `{feature: shap_value, ...}` for that record
+- `base_value`, model's expected output (log-odds baseline)
+- `predicted_probability`, actual model output for this record
 
 ### Outputs
 - `dwh_monitoring_shap.results` (aggregate per run)
 - `dwh_monitoring_shap.customer_shap_values` (per-record SHAP)
-- MLflow experiment `monitoring_shap` - beeswarm + bar chart artifacts
+- MLflow experiment `monitoring_shap`, beeswarm + bar chart artifacts
 - `/data/monitoring/shap/run_NNNNN.parquet`
 
 ---
 
-## DAG 05 - Retraining
+## DAG 05, Retraining
 
 **File**: `airflow/dags/dag_05_retraining.py`  
 **Schedule**: None (event-driven via dag_04a or manual)  
@@ -216,17 +216,17 @@ trigger_post_retrain_metrics  (dag_04a with skip_retrain_trigger=True)
 If the gate fails, the DAG fails and the current Production model remains unchanged.
 
 ### Inputs / Outputs
-- **Input**: `dwh_clean.cleaned_features` - **all available records** (no time window filter)
+- **Input**: `dwh_clean.cleaned_features`, **all available records** (no time window filter)
 - **Artifact**: `reference_data.parquet` logged to MLflow run (training features, used by drift monitor)
 - **Output**: new MLflow model version with `production` alias; `dwh_history.retraining_log` row
 - **Post-retrain**: triggers dag_04a with `skip_retrain_trigger=True` to verify new model quality
 
 ---
 
-## DAG 06 - Challenger Comparison
+## DAG 06, Challenger Comparison
 
 **File**: `airflow/dags/dag_06_challenger_comparison.py`  
-**Schedule**: None (manual - triggered from Control Panel Challenger tab)  
+**Schedule**: None (manual, triggered from Control Panel Challenger tab)  
 **Purpose**: Compare a challenger model (logged to MLflow) against the current Production model using StratifiedKFold cross-validation on recent labelled ground truth.
 
 ### Conf
@@ -266,6 +266,6 @@ promote_challenger       skip_promotion
 | `CHALLENGER_CV_MARGIN` | `0.05` | Minimum improvement required (absolute, on primary metric) |
 
 ### Outputs
-- `dwh_challenger.comparison_log` - CV scores, `challenger_wins`, `force_deploy`, `promoted`
-- MLflow experiment `challenger_experiments` - comparison metrics logged
+- `dwh_challenger.comparison_log`, CV scores, `challenger_wins`, `force_deploy`, `promoted`
+- MLflow experiment `challenger_experiments`, comparison metrics logged
 - On promotion: Flask reloaded, new version gets `production` alias

@@ -105,7 +105,7 @@ End-to-end MLOps platform for binary credit risk classification (loan default pr
 
   [4] RETRAINING  (dag_05, triggered by dag_04a when primary metric below threshold)
   ┌────────────────────────────────────────────────────────────────┐
-  │  training/train.py - hyperparameter search, trains on ALL data  │
+  │  training/train.py, hyperparameter search, trains on ALL data  │
   │  Triggered when: primary_metric < MIN_ROC_AUC (default 0.60)   │
   └────────────────────────────────────────────────────────────────┘
            on success:
@@ -142,9 +142,9 @@ End-to-end MLOps platform for binary credit risk classification (loan default pr
 | `mlops-flask-api` | `./services/model_serving` | 5001 | Model serving endpoint (gunicorn + Flask) |
 | `mlops-streamlit-ui` | `./services/streamlit_ui` | 8501 | Control Panel |
 | `mlops-streamlit-dashboard` | `./services/streamlit_ui` | 8502 | Monitoring Dashboard |
-| `mlops-jupyter` | `./infrastructure/jupyter` | 8888 | JupyterLab - EDA + challenger prototyping |
+| `mlops-jupyter` | `./infrastructure/jupyter` | 8888 | JupyterLab, EDA + challenger prototyping |
 
-Pipeline scripts (data_generator, processing_pipeline, batch_inference, monitoring modules) run as Airflow BashOperator tasks - they are NOT long-running services.
+Pipeline scripts (data_generator, processing_pipeline, batch_inference, monitoring modules) run as Airflow BashOperator tasks, they are NOT long-running services.
 
 ---
 
@@ -157,7 +157,7 @@ mlops (database)
 ├── dwh_clean                  feature-engineered records (model input)
 │   └── cleaned_features
 ├── dwh_history                batch run tracking + prediction + ground truth
-│   ├── run_registry           SERIAL run_index - one row per batch run
+│   ├── run_registry           SERIAL run_index, one row per batch run
 │   ├── prediction_ground_truth  features, score, actual_default_flag per record
 │   └── retraining_log         audit trail of every retraining event
 ├── dwh_monitoring_hard        classification metrics per run
@@ -169,7 +169,7 @@ mlops (database)
 │   └── customer_shap_values   per-record: shap_values JSONB, base_value
 ├── dwh_challenger             challenger comparison audit
 │   └── comparison_log         CV scores, promoted flag, force_deploy
-├── dwh_predictions            batch inference output (legacy - still populated)
+├── dwh_predictions            batch inference output (legacy, still populated)
 │   └── batch_predictions
 ├── airflow                    Airflow backend (auto-managed)
 └── mlflow                     MLflow backend (auto-managed)
@@ -229,7 +229,7 @@ No `staging` alias exists. The registry uses `production` alias + `stage` tag fo
 | `dag_03_batch_inference` | manual | Full pipeline: generate → process → score → write history → trigger dag_04a |
 | `dag_04a_monitor_hard` | event-driven / manual | Compute all 6 metrics; auto-triggers dag_05 if primary metric below threshold |
 | `dag_04b_monitor_drift` | manual | KS drift analysis vs training reference distribution |
-| `dag_04c_monitor_shap` | manual | SHAP values - aggregate + per-customer (waterfall source) |
+| `dag_04c_monitor_shap` | manual | SHAP values, aggregate + per-customer (waterfall source) |
 | `dag_05_retraining` | event-driven / manual | Hyperparameter search → train on ALL data → quality gate → promote → reload |
 | `dag_06_challenger_comparison` | manual | StratifiedKFold CV challenger vs production; promote if wins or force_deploy=True |
 
@@ -246,9 +246,9 @@ Each generated record receives a **deterministic customer UUID** computed with `
 Only **covariate drift** is simulated (feature distributions shift). The target relationship (the logistic formula that determines default_flag) stays constant. This mirrors real credit risk scenarios where macroeconomic conditions change applicant profiles while default mechanics remain stable.
 
 The `drift_factor` parameter [0.0–1.0] controls shift intensity:
-- `0.0` - stable distribution (training reference)
-- `0.5` - moderate shift: credit_score mean drops, DTI increases, income variance grows
-- `1.0` - severe shift: most features significantly displaced
+- `0.0`, stable distribution (training reference)
+- `0.5`, moderate shift: credit_score mean drops, DTI increases, income variance grows
+- `1.0`, severe shift: most features significantly displaced
 
 ---
 

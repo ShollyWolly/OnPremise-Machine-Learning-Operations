@@ -221,8 +221,8 @@ services:
   # ---------------------------------------------------------------------------
   flask-api:
     build:
-      context: ./services/model_serving
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: model_serving/Dockerfile
     container_name: mlops-flask-api
     restart: unless-stopped
     env_file: .env

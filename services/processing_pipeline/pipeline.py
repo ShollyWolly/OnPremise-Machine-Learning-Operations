@@ -16,6 +16,7 @@ Usage:
 import argparse
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -26,6 +27,12 @@ from dotenv import load_dotenv
 
 from clean import clean
 from ingest import ingest
+
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from schema import CLEAN_SCHEMA, RAW_SCHEMA  # noqa: E402
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -78,6 +85,15 @@ def write_clean_postgres(df: pd.DataFrame) -> None:
     log.info("PostgreSQL: inserted %d rows into dwh_clean.cleaned_features", len(df))
 
 
+def _validate_schema(df: pd.DataFrame, schema, label: str) -> None:
+    try:
+        schema.validate(df)
+        log.info("Schema validation passed: %s (%d rows)", label, len(df))
+    except Exception as exc:
+        log.error("Schema validation FAILED: %s — %s", label, exc)
+        raise
+
+
 def run_pipeline(raw_dir: str, processed_dir: str) -> None:
     log.info("=== Processing Pipeline START ===")
 
@@ -86,10 +102,14 @@ def run_pipeline(raw_dir: str, processed_dir: str) -> None:
         log.info("Nothing to process. Exiting.")
         return
 
+    _validate_schema(raw_df, RAW_SCHEMA, "raw")
+
     clean_df = clean(raw_df)
     if clean_df.empty:
         log.warning("All records dropped during cleaning. Exiting.")
         return
+
+    _validate_schema(clean_df, CLEAN_SCHEMA, "clean")
 
     write_clean_parquet(clean_df, processed_dir)
     write_clean_postgres(clean_df)

@@ -28,6 +28,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import tempfile
 from datetime import datetime
 
@@ -46,6 +47,17 @@ from sklearn.preprocessing import StandardScaler
 
 from evaluate import compute_metrics, passes_promotion_gate
 
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "services")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from platform_config import (  # noqa: E402
+    FEATURE_COLUMNS,
+    MODEL_REGISTRY_NAME_DEFAULT,
+    TARGET_COLUMN,
+    TRAINING_EXPERIMENT,
+)
+
 try:
     from xgboost import XGBClassifier
     XGBOOST_AVAILABLE = True
@@ -56,14 +68,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-FEATURE_COLUMNS = [
-    "age", "annual_income", "credit_score", "loan_amount",
-    "loan_term_months", "employment_length_years", "home_ownership_encoded",
-    "debt_to_income_ratio", "num_credit_lines", "payment_history_score",
-]
-TARGET_COLUMN = "default_flag"
-MODEL_REGISTRY_NAME = os.getenv("MODEL_REGISTRY_NAME", "credit-risk-classifier")
-EXPERIMENT_NAME = "credit-risk-training"
+MODEL_REGISTRY_NAME = os.getenv("MODEL_REGISTRY_NAME", MODEL_REGISTRY_NAME_DEFAULT)
+EXPERIMENT_NAME = TRAINING_EXPERIMENT
 
 PARAM_DISTRIBUTIONS = {
     "xgboost": {

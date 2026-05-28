@@ -16,6 +16,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -26,15 +27,16 @@ import psycopg2.extras
 import requests
 from dotenv import load_dotenv
 
+_SERVICES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+if _SERVICES_ROOT not in sys.path:
+    sys.path.insert(0, _SERVICES_ROOT)
+
+from platform_config import FEATURE_COLUMNS  # noqa: E402
+from schema import INFERENCE_FEATURE_SCHEMA  # noqa: E402
+
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
-
-FEATURE_COLUMNS = [
-    "age", "annual_income", "credit_score", "loan_amount",
-    "loan_term_months", "employment_length_years", "home_ownership_encoded",
-    "debt_to_income_ratio", "num_credit_lines", "payment_history_score",
-]
 
 
 def _db_conn():
@@ -166,6 +168,12 @@ def run_inference(
 
     clean_df = load_clean_data(processed_dir)
     clean_df["record_id"] = clean_df["record_id"].astype(str)
+
+    try:
+        INFERENCE_FEATURE_SCHEMA.validate(clean_df[FEATURE_COLUMNS])
+        log.info("Feature schema validation passed (%d rows)", len(clean_df))
+    except Exception as exc:
+        raise ValueError(f"Loaded data failed schema validation: {exc}") from exc
 
     all_predictions = []
     model_name, model_version = "", ""
