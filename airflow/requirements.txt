@@ -1,0 +1,11 @@
+mlflow==2.14.3
+pandas==2.2.2
+pyarrow>=14.0,<18.0
+psycopg2-binary==2.9.9
+scikit-learn==1.5.1
+requests==2.32.3
+python-dotenv==1.0.1
+evidently==0.4.30
+shap==0.44.1
+xgboost==2.1.0
+matplotlib==3.9.1

@@ -1,0 +1,44 @@
+# Environment — .env is intentionally committed with demo defaults
+# *.env.local contains machine-specific overrides and is NOT committed
+*.env.local
+.env
+
+# Docker volume data — bind-mounted to ./volumes/ (do not commit)
+volumes/airflow-logs/
+volumes/data-raw/
+volumes/data-processed/
+volumes/data-predictions/
+volumes/data-monitoring/
+volumes/mlflow-artifacts/
+volumes/postgres-data/
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Airflow
+airflow/logs/
+airflow/plugins/
+
+# IDE
+.idea/
+.vscode/
+*.swp

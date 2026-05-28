@@ -1,0 +1,389 @@
+# =============================================================================
+# MLOps Platform — Docker Compose Stack
+#
+# Services:
+#   postgres          — PostgreSQL 15 (all schemas)
+#   mlflow            — MLflow tracking server + model registry (port 5000)
+#   platform-init     — One-shot bootstrap: Airflow DB, admin user, permissions,
+#                       initial training data + model if none exists
+#   airflow-webserver — Airflow UI (port 8080)
+#   airflow-scheduler — Airflow task scheduler
+#   flask-api         — Flask model serving (port 5001)
+#   streamlit-ui      — Control UI: deploy / generate / infer / monitor (port 8501)
+#
+# Start: docker compose up -d
+# Logs:  docker compose logs -f <service>
+# Reset: docker compose down -v && docker compose up -d
+# =============================================================================
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  env_file: .env
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+    AIRFLOW__CORE__PARALLELISM: "4"
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+    POSTGRES_HOST: ${POSTGRES_HOST}
+    POSTGRES_PORT: ${POSTGRES_PORT}
+    POSTGRES_DB: ${POSTGRES_DB}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    MODEL_REGISTRY_NAME: ${MODEL_REGISTRY_NAME}
+    MIN_ROC_AUC: ${MIN_ROC_AUC:-0.60}
+    CHALLENGER_CV_FOLDS: ${CHALLENGER_CV_FOLDS:-5}
+    CHALLENGER_CV_MARGIN: ${CHALLENGER_CV_MARGIN:-0.05}
+    DEFAULT_PRIMARY_METRIC: ${DEFAULT_PRIMARY_METRIC:-roc_auc}
+    DATA_RAW_PATH: /data/raw
+    DATA_PROCESSED_PATH: /data/processed
+    DATA_PREDICTIONS_PATH: /data/predictions
+    DATA_MONITORING_HARD_PATH: /data/monitoring/hard
+    DATA_MONITORING_DRIFT_PATH: /data/monitoring/drift
+    DATA_MONITORING_SHAP_PATH: /data/monitoring/shap
+    FLASK_ENDPOINT: http://flask-api:5001
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./volumes/airflow-logs:/opt/airflow/logs
+    - ./data/raw:/data/raw
+    - ./data/processed:/data/processed
+    - ./data/predictions:/data/predictions
+    - ./data/monitoring:/data/monitoring
+    - ./volumes/mlflow-artifacts:/mlflow-artifacts
+    - ./services:/opt/mlops/services
+    - ./training:/opt/mlops/training
+  depends_on:
+    postgres:
+      condition: service_healthy
+    mlflow:
+      condition: service_started
+  networks:
+    - mlops-net
+
+services:
+  # ---------------------------------------------------------------------------
+  # Volume Init — runs as root to create dirs and set permissions before
+  # platform-init (which runs as Airflow uid=50000) starts.
+  # ---------------------------------------------------------------------------
+  volume-init:
+    image: alpine
+    container_name: mlops-volume-init
+    command:
+      - sh
+      - -c
+      - "mkdir -p /data/raw /data/processed /data/predictions /data/monitoring/hard /data/monitoring/drift /data/monitoring/shap && chown -R 50000:0 /data && chmod -R 775 /data && mkdir -p /mlflow-artifacts && chown -R 50000:0 /mlflow-artifacts && chmod -R 775 /mlflow-artifacts && echo 'Volume permissions set.'"
+    volumes:
+      - ./data/raw:/data/raw
+      - ./data/processed:/data/processed
+      - ./data/predictions:/data/predictions
+      - ./data/monitoring:/data/monitoring
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+    restart: "no"
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — primary relational store
+  # Schemas are created by init scripts on first start (fresh volume).
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15
+    container_name: mlops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: mlops
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./volumes/postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/00_create_roles.sql:/docker-entrypoint-initdb.d/00_create_roles.sql:ro
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mlops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # MLflow — experiment tracking + model registry
+  # ---------------------------------------------------------------------------
+  mlflow:
+    build:
+      context: ./infrastructure/mlflow
+      dockerfile: Dockerfile
+    container_name: mlops-mlflow
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_BACKEND_STORE_URI}
+      MLFLOW_ARTIFACT_ROOT: ${MLFLOW_ARTIFACT_ROOT}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      mlflow server
+      --backend-store-uri ${MLFLOW_BACKEND_STORE_URI}
+      --default-artifact-root ${MLFLOW_ARTIFACT_ROOT}
+      --host 0.0.0.0
+      --port 5000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\" || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # Platform Init — ONE-SHOT bootstrap container
+  # Runs on every `docker compose up`; idempotent (skips steps already done).
+  # Migrates Airflow DB, creates admin user, fixes permissions,
+  # trains initial model if registry is empty.
+  # All subsequent services wait for this to complete.
+  # ---------------------------------------------------------------------------
+  platform-init:
+    <<: *airflow-common
+    container_name: mlops-platform-init
+    command: bash /opt/mlops/init.sh
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./volumes/airflow-logs:/opt/airflow/logs
+      - ./data/raw:/data/raw
+      - ./data/processed:/data/processed
+      - ./data/predictions:/data/predictions
+      - ./data/monitoring:/data/monitoring
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+      - ./services:/opt/mlops/services
+      - ./training:/opt/mlops/training
+      - ./airflow/init.sh:/opt/mlops/init.sh:ro
+    restart: "no"
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Airflow — orchestration
+  # ---------------------------------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: mlops-airflow-webserver
+    restart: unless-stopped
+    command: airflow webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: mlops-airflow-scheduler
+    restart: unless-stopped
+    command: airflow scheduler
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Flask Model Serving API
+  # Loads Production model from MLflow registry at startup.
+  # POST /predict — batch prediction
+  # GET  /health  — liveness probe
+  # POST /reload  — hot-swap to latest Production model
+  # ---------------------------------------------------------------------------
+  flask-api:
+    build:
+      context: ./services/model_serving
+      dockerfile: Dockerfile
+    container_name: mlops-flask-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      MODEL_REGISTRY_NAME: ${MODEL_REGISTRY_NAME}
+      MODEL_ALIAS: ${MODEL_ALIAS:-production}
+      DECISION_THRESHOLD: ${DECISION_THRESHOLD}
+      FLASK_PORT: ${FLASK_PORT}
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5001/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # Streamlit Control Panel — deploy / inference / monitor triggers / DAG logs
+  # ---------------------------------------------------------------------------
+  streamlit-ui:
+    build:
+      context: ./services/streamlit_ui
+      dockerfile: Dockerfile
+      args:
+        APP_FILE: control_panel.py
+        PORT: "8501"
+    container_name: mlops-streamlit-ui
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      FLASK_ENDPOINT: http://flask-api:5001
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MODEL_REGISTRY_NAME: ${MODEL_REGISTRY_NAME}
+      DATA_RAW_PATH: /data/raw
+      DATA_PROCESSED_PATH: /data/processed
+      DATA_PREDICTIONS_PATH: /data/predictions
+      DATA_MONITORING_HARD_PATH: /data/monitoring/hard
+      DATA_MONITORING_DRIFT_PATH: /data/monitoring/drift
+      DATA_MONITORING_SHAP_PATH: /data/monitoring/shap
+      MIN_ROC_AUC: ${MIN_ROC_AUC:-0.60}
+      DEFAULT_PRIMARY_METRIC: ${DEFAULT_PRIMARY_METRIC:-roc_auc}
+      AIRFLOW_API_URL: http://airflow-webserver:8080/api/v1
+      AIRFLOW_USER: ${AIRFLOW_ADMIN_USER:-admin}
+      AIRFLOW_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./data/raw:/data/raw
+      - ./data/processed:/data/processed
+      - ./data/predictions:/data/predictions
+      - ./data/monitoring:/data/monitoring
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+      - ./services:/opt/mlops/services
+      - ./training:/opt/mlops/training
+    ports:
+      - "8501:8501"
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      flask-api:
+        condition: service_healthy
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # Streamlit Monitoring Dashboard — data drift, hard metrics, SHAP
+  # ---------------------------------------------------------------------------
+  streamlit-dashboard:
+    build:
+      context: ./services/streamlit_ui
+      dockerfile: Dockerfile
+      args:
+        APP_FILE: dashboard.py
+        PORT: "8502"
+    container_name: mlops-streamlit-dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      FLASK_ENDPOINT: http://flask-api:5001
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MODEL_REGISTRY_NAME: ${MODEL_REGISTRY_NAME}
+      DATA_MONITORING_HARD_PATH: /data/monitoring/hard
+      DATA_MONITORING_DRIFT_PATH: /data/monitoring/drift
+      DATA_MONITORING_SHAP_PATH: /data/monitoring/shap
+    volumes:
+      - ./data/monitoring:/data/monitoring
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+      - ./services:/opt/mlops/services
+    ports:
+      - "8502:8502"
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      flask-api:
+        condition: service_healthy
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # JupyterLab — prototyping environment for challenger model development
+  # Access: http://localhost:8888 (no auth — internal network only)
+  # ---------------------------------------------------------------------------
+  jupyter:
+    build:
+      context: ./infrastructure/jupyter
+      dockerfile: Dockerfile
+    container_name: mlops-jupyter
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MODEL_REGISTRY_NAME: ${MODEL_REGISTRY_NAME}
+      SETUPTOOLS_USE_DISTUTILS: stdlib
+    volumes:
+      - ./notebooks:/home/jupyter/notebooks
+      - ./data:/data
+      - ./volumes/mlflow-artifacts:/mlflow-artifacts
+      - ./training:/opt/mlops/training
+      - ./services:/opt/mlops/services
+    ports:
+      - "8888:8888"
+    depends_on:
+      platform-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
+    networks:
+      - mlops-net
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+# Volumes — bind-mounted to ./volumes/ (see .gitignore)
+# =============================================================================
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  mlops-net:
+    driver: bridge
