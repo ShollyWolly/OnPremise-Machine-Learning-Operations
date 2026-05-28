@@ -69,6 +69,9 @@ def compute_all_metrics(
     y_true  = np.asarray(y_true, dtype=int)
     y_score = np.asarray(y_score, dtype=float)
 
+    if len(np.unique(y_true)) < 2:
+        raise ValueError("y_true must contain at least two classes to compute metrics.")
+
     if y_pred is None:
         y_pred = (y_score >= threshold).astype(int)
     else:
