@@ -4,16 +4,18 @@
 # Services:
 #   postgres          - PostgreSQL 15 (all schemas)
 #   mlflow            - MLflow tracking server + model registry (port 5000)
-#   platform-init     - One-shot bootstrap: Airflow DB, admin user, permissions,
-#                       initial training data + model if none exists
 #   airflow-webserver - Airflow UI (port 8080)
 #   airflow-scheduler - Airflow task scheduler
 #   flask-api         - Flask model serving (port 5001)
 #   streamlit-ui      - Control UI: deploy / generate / infer / monitor (port 8501)
+#   streamlit-dashboard - Monitoring dashboard: drift, hard metrics, SHAP (port 8502)
+#   evidently-ui      - Self-hosted Evidently drift/classification report viewer (port 8000)
 #
-# Start: docker compose up -d
-# Logs:  docker compose logs -f <service>
-# Reset: docker compose down -v && docker compose up -d
+# First run: ./setup.sh   (migrates Airflow DB, creates admin user, trains an
+#                           initial model, then brings up the rest of the stack)
+# Start:     docker compose up -d
+# Logs:      docker compose logs -f <service>
+# Reset:     docker compose down -v && ./setup.sh
 # =============================================================================
 
 x-airflow-common: &airflow-common
@@ -48,6 +50,7 @@ x-airflow-common: &airflow-common
     DATA_MONITORING_HARD_PATH: /data/monitoring/hard
     DATA_MONITORING_DRIFT_PATH: /data/monitoring/drift
     DATA_MONITORING_SHAP_PATH: /data/monitoring/shap
+    EVIDENTLY_WORKSPACE_PATH: /data/monitoring/evidently_workspace
     FLASK_ENDPOINT: http://flask-api:5001
   volumes:
     - ./airflow/dags:/opt/airflow/dags
@@ -59,6 +62,7 @@ x-airflow-common: &airflow-common
     - ./volumes/mlflow-artifacts:/mlflow-artifacts
     - ./services:/opt/mlops/services
     - ./training:/opt/mlops/training
+    - ./airflow/init.sh:/opt/mlops/init.sh:ro
   depends_on:
     postgres:
       condition: service_healthy
@@ -68,27 +72,6 @@ x-airflow-common: &airflow-common
     - mlops-net
 
 services:
-  # ---------------------------------------------------------------------------
-  # Volume Init - runs as root to create dirs and set permissions before
-  # platform-init (which runs as Airflow uid=50000) starts.
-  # ---------------------------------------------------------------------------
-  volume-init:
-    image: alpine
-    container_name: mlops-volume-init
-    command:
-      - sh
-      - -c
-      - "mkdir -p /data/raw /data/processed /data/predictions /data/monitoring/hard /data/monitoring/drift /data/monitoring/shap && chown -R 50000:0 /data && chmod -R 775 /data && mkdir -p /mlflow-artifacts && chown -R 50000:0 /mlflow-artifacts && chmod -R 775 /mlflow-artifacts && echo 'Volume permissions set.'"
-    volumes:
-      - ./data/raw:/data/raw
-      - ./data/processed:/data/processed
-      - ./data/predictions:/data/predictions
-      - ./data/monitoring:/data/monitoring
-      - ./volumes/mlflow-artifacts:/mlflow-artifacts
-    restart: "no"
-    networks:
-      - mlops-net
-
   # ---------------------------------------------------------------------------
   # PostgreSQL - primary relational store
   # Schemas are created by init scripts on first start (fresh volume).
@@ -150,37 +133,6 @@ services:
       - mlops-net
 
   # ---------------------------------------------------------------------------
-  # Platform Init - ONE-SHOT bootstrap container
-  # Runs on every `docker compose up`; idempotent (skips steps already done).
-  # Migrates Airflow DB, creates admin user, fixes permissions,
-  # trains initial model if registry is empty.
-  # All subsequent services wait for this to complete.
-  # ---------------------------------------------------------------------------
-  platform-init:
-    <<: *airflow-common
-    container_name: mlops-platform-init
-    command: bash /opt/mlops/init.sh
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./volumes/airflow-logs:/opt/airflow/logs
-      - ./data/raw:/data/raw
-      - ./data/processed:/data/processed
-      - ./data/predictions:/data/predictions
-      - ./data/monitoring:/data/monitoring
-      - ./volumes/mlflow-artifacts:/mlflow-artifacts
-      - ./services:/opt/mlops/services
-      - ./training:/opt/mlops/training
-      - ./airflow/init.sh:/opt/mlops/init.sh:ro
-    restart: "no"
-    depends_on:
-      volume-init:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-      mlflow:
-        condition: service_started
-
-  # ---------------------------------------------------------------------------
   # Airflow - orchestration
   # ---------------------------------------------------------------------------
   airflow-webserver:
@@ -195,22 +147,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    depends_on:
-      platform-init:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
 
   airflow-scheduler:
     <<: *airflow-common
     container_name: mlops-airflow-scheduler
     restart: unless-stopped
     command: airflow scheduler
-    depends_on:
-      platform-init:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
 
   # ---------------------------------------------------------------------------
   # Flask Model Serving API
@@ -237,8 +179,6 @@ services:
     volumes:
       - ./volumes/mlflow-artifacts:/mlflow-artifacts
     depends_on:
-      platform-init:
-        condition: service_completed_successfully
       mlflow:
         condition: service_healthy
     healthcheck:
@@ -293,8 +233,6 @@ services:
     ports:
       - "8501:8501"
     depends_on:
-      platform-init:
-        condition: service_completed_successfully
       flask-api:
         condition: service_healthy
     networks:
@@ -325,6 +263,7 @@ services:
       DATA_MONITORING_HARD_PATH: /data/monitoring/hard
       DATA_MONITORING_DRIFT_PATH: /data/monitoring/drift
       DATA_MONITORING_SHAP_PATH: /data/monitoring/shap
+      EVIDENTLY_UI_URL: ${EVIDENTLY_UI_URL:-http://localhost:8000}
     volumes:
       - ./data/monitoring:/data/monitoring
       - ./volumes/mlflow-artifacts:/mlflow-artifacts
@@ -332,10 +271,36 @@ services:
     ports:
       - "8502:8502"
     depends_on:
-      platform-init:
-        condition: service_completed_successfully
       flask-api:
         condition: service_healthy
+    networks:
+      - mlops-net
+
+  # ---------------------------------------------------------------------------
+  # Evidently UI - self-hosted drift / classification report viewer
+  # Fed by services/monitoring/{data_drift,hard_metrics}.py via a shared Workspace
+  # directory; embedded in the Streamlit dashboard and browsable directly.
+  # ---------------------------------------------------------------------------
+  evidently-ui:
+    build:
+      context: ./services/monitoring
+      dockerfile: Dockerfile
+    container_name: mlops-evidently-ui
+    restart: unless-stopped
+    # Same uid as airflow (and flask-api's own uid-50000 user) so directories created on the
+    # shared /data/monitoring volume are writable across containers regardless of who writes first.
+    user: "50000:0"
+    environment:
+      # uid 50000 has no home dir in this image; evidently's telemetry code always tries to
+      # write a user-id file under the XDG config dir regardless of ITERATIVE_DO_NOT_TRACK
+      # (that env var only short-circuits when the underlying check is a callable, which it
+      # isn't here) - point it at a writable path instead of the unwritable default (~/.config).
+      XDG_CONFIG_HOME: /tmp/.config
+    entrypoint: ["evidently", "ui", "--host", "0.0.0.0", "--port", "8000", "--workspace", "/data/monitoring/evidently_workspace"]
+    volumes:
+      - ./data/monitoring:/data/monitoring
+    ports:
+      - "8000:8000"
     networks:
       - mlops-net
 
@@ -368,8 +333,6 @@ services:
     ports:
       - "8888:8888"
     depends_on:
-      platform-init:
-        condition: service_completed_successfully
       mlflow:
         condition: service_healthy
     networks:

@@ -3,7 +3,9 @@
 A self-contained MLOps platform for credit-risk binary classification. Covers the full lifecycle: data generation, feature engineering, model training, serving, monitoring, and challenger comparison, all orchestrated through Apache Airflow and wired together with MLflow, PostgreSQL, and two Streamlit UIs.
 
 ```bash
-docker compose up -d
+cp .env.example .env   # first time only, then edit it
+./setup.sh              # first time only - bootstraps DB, admin user, initial model
+docker compose up -d    # subsequent restarts
 ```
 
 **Endpoints after startup**
@@ -12,6 +14,7 @@ docker compose up -d
 |---|---|
 | Control Panel | http://localhost:8501 |
 | Monitoring Dashboard | http://localhost:8502 |
+| Evidently UI | http://localhost:8000 |
 | MLflow UI | http://localhost:5000 |
 | Airflow UI | http://localhost:8080 |
 | JupyterLab | http://localhost:8888 |
@@ -28,6 +31,7 @@ graph TB
     subgraph UI["User Interfaces"]
         CP["🎛️ Control Panel<br/>:8501"]
         MD["📊 Monitoring Dashboard<br/>:8502"]
+        EV["📈 Evidently UI<br/>:8000"]
         JL["📓 JupyterLab<br/>:8888"]
     end
 
@@ -105,13 +109,15 @@ stateDiagram-v2
 |---|---|---|
 | `mlops-postgres` | `postgres:15` | Primary relational store, all schemas |
 | `mlops-mlflow` | `./infrastructure/mlflow` | Experiment tracking + model registry |
-| `mlops-platform-init` | `./airflow` | One-shot bootstrap (idempotent) |
 | `mlops-airflow-webserver` | `./airflow` | Airflow UI |
 | `mlops-airflow-scheduler` | `./airflow` | DAG scheduler |
 | `mlops-flask-api` | `./services/model_serving` | Gunicorn + Flask prediction API |
 | `mlops-streamlit-ui` | `./services/streamlit_ui` | Control Panel (`control_panel.py`) |
 | `mlops-streamlit-dashboard` | `./services/streamlit_ui` | Monitoring Dashboard (`dashboard.py`) |
+| `mlops-evidently-ui` | `./services/monitoring` | Self-hosted Evidently report viewer |
 | `mlops-jupyter` | `./infrastructure/jupyter` | JupyterLab for prototyping and EDA |
+
+Bootstrap (Airflow DB migration, admin user, initial model) runs via `./setup.sh`, not a standing container.
 
 All containers share the `mlops-net` bridge network and run as `uid=50000` on bind-mounted volumes.
 
@@ -214,23 +220,20 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 cp .env.example .env
 # Edit .env - set passwords, generate AIRFLOW__CORE__FERNET_KEY
 
-# 2. Start
-docker compose up -d
+# 2. Start (first time - runs bootstrap: DB migration, admin user, initial model)
+./setup.sh
 
-# 3. Wait for bootstrap (~60–120 s)
-docker compose logs -f platform-init
-
-# 4. Open Control Panel
+# 3. Open Control Panel
 #    http://localhost:8501
 #    Pipelines tab → Batch Inference → Run
 
-# 5. Monitor
+# 4. Monitor
 #    http://localhost:8502
 ```
 
 **Reset to clean state:**
 ```bash
-docker compose down -v && docker compose up -d
+docker compose down -v && ./setup.sh
 ```
 
 ---
@@ -282,9 +285,9 @@ All notebooks connect to PostgreSQL and MLflow via environment variables pre-wir
 ├── services/
 │   ├── metrics.py             Shared metric catalogue
 │   ├── monitoring/
-│   │   ├── hard_metrics.py
-│   │   ├── drift.py
-│   │   └── shap_monitor.py
+│   │   ├── hard_metrics.py     Evidently ClassificationPreset
+│   │   ├── data_drift.py       Evidently DataDriftPreset
+│   │   └── shap_explainability.py
 │   ├── model_serving/         Flask API + Dockerfile
 │   └── streamlit_ui/
 │       ├── control_panel.py   :8501

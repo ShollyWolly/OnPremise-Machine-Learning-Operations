@@ -243,6 +243,7 @@ CREATE TABLE IF NOT EXISTS dwh_monitoring_hard.results (
     retraining_reason       TEXT,
     mlflow_run_id           VARCHAR(100),
     parquet_path            TEXT,
+    evidently_snapshot_id   VARCHAR(36),
     evaluated_at            TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 
@@ -266,6 +267,7 @@ CREATE TABLE IF NOT EXISTS dwh_monitoring_drift.results (
     reference_run_id        VARCHAR(100),
     n_records               INT,
     parquet_path            TEXT,
+    evidently_snapshot_id   VARCHAR(36),
     evaluated_at            TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 

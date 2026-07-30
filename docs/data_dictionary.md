@@ -139,6 +139,7 @@ One row per batch run evaluation. Unique constraint on `run_index`, re-running m
 | `retraining_reason` | TEXT | YES | Human-readable explanation of trigger decision. |
 | `mlflow_run_id` | VARCHAR(100) | YES | Corresponding MLflow run ID in monitoring_hard experiment. |
 | `parquet_path` | TEXT | YES | Path to local parquet file. |
+| `evidently_snapshot_id` | VARCHAR(36) | YES | Snapshot id in the Evidently UI's `credit-risk-hard-metrics` project (deep link: `http://localhost:8000/projects/{project_id}/reports/{id}`). |
 | `evaluated_at` | TIMESTAMP | NO | When monitoring ran. |
 
 ---
@@ -154,13 +155,14 @@ One row per batch run drift evaluation. Unique on `run_index`.
 | `id` | UUID | NO | Primary key. |
 | `run_index` | INT | NO | UNIQUE. The batch run being analysed. |
 | `batch_run_id` | VARCHAR(36) | YES | UUID of the batch run. |
-| `drift_detected` | BOOLEAN | NO | True if drift_score > MAX_DRIFT_SCORE. |
+| `drift_detected` | BOOLEAN | NO | True if drift_score >= MAX_DRIFT_FEATURE_FRACTION (Evidently `DataDriftPreset(drift_share=...)`). |
 | `drift_score` | FLOAT | YES | Fraction of features with significant drift [0, 1]. |
 | `num_drifted_features` | INT | YES | Count of features that drifted. |
 | `drifted_feature_names` | TEXT | YES | Comma-separated list of drifted feature names. |
 | `reference_run_id` | VARCHAR(100) | YES | MLflow run ID of the reference model whose artifact was used. |
 | `n_records` | INT | YES | Records in the current batch. |
 | `parquet_path` | TEXT | YES | Path to local parquet file. |
+| `evidently_snapshot_id` | VARCHAR(36) | YES | Snapshot id in the Evidently UI's `credit-risk-data-drift` project (deep link: `http://localhost:8000/projects/{project_id}/reports/{id}`). |
 | `evaluated_at` | TIMESTAMP | NO | When drift analysis ran. |
 
 ---

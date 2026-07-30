@@ -4,6 +4,8 @@ Contains values that are not environment-specific and are referenced across
 multiple modules — centralised here to eliminate duplication.
 """
 
+import uuid
+
 FEATURE_COLUMNS: list[str] = [
     "age",
     "annual_income",
@@ -31,3 +33,12 @@ DECISION_THRESHOLD_DEFAULT: float = 0.5
 MIN_ROC_AUC_DEFAULT: float = 0.70
 
 MAX_INFERENCE_BATCH_SIZE: int = 1000
+
+# Evidently self-hosted UI (docker-compose service 'evidently-ui', port 8000).
+# Project ids are derived deterministically from a fixed name so every monitoring
+# run resolves to the same project without needing to persist the id anywhere.
+EVIDENTLY_UUID_NAMESPACE = uuid.UUID("c9a1f9d4-6f1e-4b8a-9e5a-3f6a2b1c7d8e")
+EVIDENTLY_DRIFT_PROJECT_NAME = "credit-risk-data-drift"
+EVIDENTLY_HARD_PROJECT_NAME = "credit-risk-hard-metrics"
+EVIDENTLY_DRIFT_PROJECT_ID = uuid.uuid5(EVIDENTLY_UUID_NAMESPACE, EVIDENTLY_DRIFT_PROJECT_NAME)
+EVIDENTLY_HARD_PROJECT_ID = uuid.uuid5(EVIDENTLY_UUID_NAMESPACE, EVIDENTLY_HARD_PROJECT_NAME)

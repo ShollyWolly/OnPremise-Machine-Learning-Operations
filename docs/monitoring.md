@@ -7,8 +7,8 @@ Three independent monitoring DAGs run against any completed batch inference run.
 | DAG | Module | Trigger |
 |---|---|---|
 | `dag_04a_monitor_hard` | `services/monitoring/hard_metrics.py` | Auto after dag_03; or manual |
-| `dag_04b_monitor_drift` | `services/monitoring/drift.py` | Manual |
-| `dag_04c_monitor_shap` | `services/monitoring/shap_monitor.py` | Manual |
+| `dag_04b_monitor_drift` | `services/monitoring/data_drift.py` | Manual |
+| `dag_04c_monitor_shap` | `services/monitoring/shap_explainability.py` | Manual |
 
 ---
 
@@ -16,7 +16,11 @@ Three independent monitoring DAGs run against any completed batch inference run.
 
 ### Metrics Computed
 
-All six metrics are computed from `services/metrics.py`, the single source of truth shared across DAGs, monitoring scripts, and UIs.
+`accuracy`, `precision`, `recall`, `f1`, and `roc_auc` come from Evidently's `ClassificationPreset`
+(`services/monitoring/hard_metrics.py::compute_metrics`), which also generates the confusion matrix,
+ROC curve, and PR curve viewable in the Evidently UI. `pr_auc` is kept from `services/metrics.py`
+(the single source of truth for the metric registry) since Evidently 0.4.x doesn't expose a scalar
+PR-AUC directly.
 
 | Key | Display Name | Notes |
 |---|---|---|
@@ -39,9 +43,10 @@ The data generator sets `created_at = NOW() - 1 day`. Ground truth (`actual_defa
 
 ### Storage
 
-- `dwh_monitoring_hard.results`, one row per `run_index`, unique constraint
+- `dwh_monitoring_hard.results`, one row per `run_index`, unique constraint (includes `evidently_snapshot_id`)
 - MLflow experiment `monitoring_hard`, all 6 metrics as MLflow metrics
 - `/data/monitoring/hard/run_NNNNN.parquet`
+- Evidently Workspace snapshot (project `credit-risk-hard-metrics`), viewable at http://localhost:8000
 
 ---
 
@@ -49,15 +54,16 @@ The data generator sets `created_at = NOW() - 1 day`. Ground truth (`actual_defa
 
 ### Methodology
 
-Kolmogorov-Smirnov test applied independently to each of the 10 model input features.
+Evidently's `DataDriftPreset` applied to the 10 model input features (`services/monitoring/data_drift.py::compute_drift`).
 
 - **Reference dataset**: `reference_data.parquet` stored in the production model's MLflow artifact store, logged at training time by `train.py`
 - **Current dataset**: feature values from `dwh_history.prediction_ground_truth` for the specified `run_index`
-- **Statistical test**: two-sample KS test per feature (p-value threshold: 0.05)
+- **Per-feature test**: Evidently auto-selects a statistical test per column (KS test for continuous numeric features by default)
+- **Dataset-level cutoff**: `DataDriftPreset(drift_share=MAX_DRIFT_FEATURE_FRACTION)` — dataset is flagged as drifted once this share of columns drift
 
 ### Drift Score
 
-`drift_score` = fraction of features with statistically significant drift.
+`drift_score` = fraction of features with statistically significant drift (Evidently's `share_of_drifted_columns`).
 
 | Score Range | Interpretation |
 |---|---|
@@ -66,7 +72,7 @@ Kolmogorov-Smirnov test applied independently to each of the 10 model input feat
 | 0.20 – 0.40 | Moderate drift, consider retraining |
 | > 0.40 | Severe drift, investigate data source |
 
-Threshold for flagging: `drift_score > MAX_DRIFT_SCORE` (env var default: 0.20)
+Threshold for flagging: `drift_score >= MAX_DRIFT_FEATURE_FRACTION` (env var default: 0.30). `dag_04b` now cascades to `dag_05_retraining` when this fires, the same way `dag_04a` does for hard metrics.
 
 ### What Drift Looks Like
 
@@ -85,8 +91,10 @@ Only covariate drift is simulated. The target relationship (what causes default)
   - `drift_score` FLOAT (fraction of drifted features)
   - `num_drifted_features` INT
   - `drifted_feature_names` TEXT (comma-separated)
+  - `evidently_snapshot_id` VARCHAR(36) — id of the report snapshot pushed to the Evidently UI
 - MLflow experiment `monitoring_drift`
 - `/data/monitoring/drift/run_NNNNN.parquet`
+- Evidently Workspace snapshot (project `credit-risk-data-drift`), viewable at http://localhost:8000
 
 ---
 
@@ -160,9 +168,17 @@ Drift alone does **not** trigger retraining directly, it is informational. Only 
 
 ### Monitoring Dashboard (http://localhost:8502)
 
-- **Hard Metrics** tab: metric cards (★ = primary metric), ROC/PR curves, confusion matrix, threshold sensitivity, trend chart across all runs
-- **Data Drift** tab: per-feature distribution overlays, KS statistics table, drift score trend
+- **Hard Metrics** tab: metric cards (★ = primary metric), trend chart across all runs, embedded Evidently classification report (confusion matrix, ROC/PR curves, quality metrics)
+- **Data Drift** tab: summary cards, dataset statistics, drift score trend, embedded Evidently drift report (per-feature distribution comparison)
 - **Explainability** tab: beeswarm plot, mean |SHAP| bar, customer waterfall selector
+
+### Evidently UI (http://localhost:8000)
+
+Self-hosted Evidently report viewer (docker-compose service `evidently-ui`), fed by a shared
+Workspace directory (`/data/monitoring/evidently_workspace`) that `hard_metrics.py` and
+`data_drift.py` push snapshots to on every run. Two projects: `credit-risk-data-drift` and
+`credit-risk-hard-metrics`. The dashboard embeds the exact run's report via
+`/projects/{project_id}/reports/{snapshot_id}`; the same URL works standalone in a browser.
 
 ### MLflow UI (http://localhost:5000)
 

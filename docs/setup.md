@@ -4,49 +4,35 @@
 
 - Docker Desktop >= 4.20 with Docker Compose v2
 - 8 GB RAM available for Docker (Airflow + PostgreSQL + MLflow are the heavy consumers)
-- Ports free: 5432, 5000, 5001, 8080, 8501, 8502, 8888
+- Ports free: 5432, 5000, 5001, 8000, 8080, 8501, 8502, 8888
 
 ## Startup Sequence
 
-When you run `docker compose up -d`, services start in dependency order:
+There's no init-container in the compose file - bootstrap is an explicit script step, run once before the stack comes up:
 
 ```
-docker compose up -d
+./setup.sh
         │
-        ▼
-┌─────────────────┐
-│    postgres     │  PostgreSQL 15 - creates all schemas via init.sql
-└────────┬────────┘
-         │ service_healthy (pg_isready passes)
-         ├────────────────────────────┐
-         ▼                            ▼
-┌─────────────────┐         ┌──────────────────┐
-│     mlflow      │         │  platform-init   │  waits for postgres + mlflow
-│  tracking +     │────────►│                  │
-│  registry       │         │  1. airflow db migrate
-└─────────────────┘         │  2. create admin user
-  service_healthy            │  3. bootstrap: generate data
-                             │     + train initial model
-                             │     (skipped if 'production' alias exists)
-                             └────────┬─────────┘
-                                      │ service_completed_successfully
-                     ┌───────────────┬┴──────────────┐─────────────────┐
-                     ▼               ▼                ▼                 ▼
-            ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-            │  airflow-    │ │  airflow-    │ │  flask-api   │ │  jupyter     │
-            │  webserver   │ │  scheduler   │ │  :5001       │ │  :8888       │
-            │  :8080       │ │              │ └──────┬───────┘ └──────────────┘
-            └──────────────┘ └──────────────┘        │ service_healthy
-                                                      ▼
-                                         ┌──────────────────────────────────┐
-                                         │ streamlit-ui :8501               │
-                                         │ streamlit-dashboard :8502        │
-                                         └──────────────────────────────────┘
+        ├─ 1. mkdir -p data/*, volumes/* + chmod (best-effort; no-op on Windows)
+        │
+        ├─ 2. docker compose up -d postgres mlflow
+        │      wait for both healthy
+        │
+        ├─ 3. docker compose run --rm airflow-webserver bash /opt/mlops/init.sh
+        │      a. airflow db migrate
+        │      b. create admin user (idempotent)
+        │      c. wait for MLflow
+        │      d. bootstrap: generate data + train initial model
+        │         (skipped if a 'production' alias already exists)
+        │
+        └─ 4. docker compose up -d
+               brings up airflow-webserver, airflow-scheduler, flask-api,
+               streamlit-ui, streamlit-dashboard, evidently-ui, jupyter
 
-  Ready when: all services show healthy/running  (~60–120 s on first run)
+  Ready when: `docker compose ps` shows all services healthy/running (~60–120 s on first run)
 ```
 
-**First-run bootstrap** (`platform-init`) trains an initial XGBoost model and assigns the `production` alias automatically, Flask and Streamlit are ready to use immediately after startup.
+Every step is idempotent - `./setup.sh` is safe to re-run any time, and on subsequent restarts (no schema/model changes) you can just use `docker compose up -d` directly.
 
 ---
 
@@ -69,13 +55,12 @@ Edit `.env`:
 ### 2. Start the stack
 
 ```bash
-docker compose up -d --build
+./setup.sh
 ```
 
-Wait ~60–120 seconds for platform-init to complete. Monitor bootstrap:
-```bash
-docker compose logs -f platform-init
-```
+This builds the images, migrates the Airflow DB, creates the admin user, and trains an initial
+model (~60–120 seconds on first run) before bringing up the rest of the stack. Output streams
+to the terminal directly - no separate container logs to follow.
 
 All services healthy:
 ```bash
@@ -111,6 +96,8 @@ Go to `http://localhost:8501`
 Go to `http://localhost:8502`
 
 After the first batch inference run + monitoring run, all three dashboard tabs will have data.
+Drift and Hard Metrics tabs embed reports from the self-hosted Evidently UI (`http://localhost:8000`),
+which you can also browse directly.
 
 ---
 
@@ -157,6 +144,7 @@ Or from Airflow UI, trigger `dag_05_retraining` with no conf.
 |---|---|---|
 | Control Panel | http://localhost:8501 | none |
 | Monitoring Dashboard | http://localhost:8502 | none |
+| Evidently UI | http://localhost:8000 | none |
 | MLflow | http://localhost:5000 | none |
 | Airflow | http://localhost:8080 | admin / admin (from AIRFLOW_ADMIN_USER/PASSWORD in .env) |
 | JupyterLab | http://localhost:8888 | none (no token) |
@@ -173,16 +161,16 @@ Or from Airflow UI, trigger `dag_05_retraining` with no conf.
 docker compose down
 
 # Full reset - removes all volumes (data lost)
-docker compose down -v && docker compose up -d
+docker compose down -v && ./setup.sh
 ```
 
 ---
 
 ## Common Issues
 
-**Platform-init keeps restarting**: MLflow or Postgres not ready yet. Check `docker compose logs platform-init`. Usually resolves within 2 minutes on first run.
+**`./setup.sh` fails waiting for postgres/mlflow**: One of them didn't reach `healthy` within 150s. Check `docker compose logs postgres` / `docker compose logs mlflow` and re-run `./setup.sh` once they're healthy - every step is idempotent.
 
-**Flask API stuck in `unhealthy`**: No `production` alias in MLflow registry. This should not happen after bootstrap, check `docker compose logs platform-init` to see if bootstrap completed successfully.
+**Flask API stuck in `unhealthy`**: No `production` alias in MLflow registry. This should not happen after `./setup.sh` completes - re-run it and check its output for bootstrap errors.
 
 **JupyterLab "File Load Error"**: The `.ipynb_checkpoints` directory may have wrong permissions if notebooks were executed via `docker exec`. Fix:
 ```bash

@@ -4,8 +4,8 @@ MLOps Monitoring Dashboard
 Port 8502  |  Control Panel on :8501
 
 Tabs:
-  Data Drift      - feature distributions, KS stats, drift trends
-  Hard Metrics    - confusion matrix, ROC, PR, calibration, metric trends
+  Data Drift      - Evidently drift report, summary cards, drift trend
+  Hard Metrics    - Evidently classification report, metric cards, metric trends
   Explainability  - SHAP beeswarm, bar, outcome-grouped impact, waterfall
 """
 
@@ -27,27 +27,8 @@ import requests
 from sqlalchemy import create_engine, text as _sql
 import shap
 import streamlit as st
+import streamlit.components.v1 as components
 from plotly.subplots import make_subplots
-from sklearn.metrics import (
-    average_precision_score,
-    confusion_matrix,
-    precision_recall_curve,
-    roc_auc_score,
-    roc_curve,
-)
-
-try:
-    from sklearn.calibration import calibration_curve
-    HAS_CALIBRATION = True
-except ImportError:
-    HAS_CALIBRATION = False
-
-try:
-    from scipy.stats import ks_2samp
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
-
 # Shared metrics catalogue
 sys.path.insert(0, "/opt/mlops/services")
 try:
@@ -58,6 +39,14 @@ except ImportError:
         "precision": "Precision", "recall": "Recall", "accuracy": "Accuracy",
     }
     DEFAULT_PRIMARY = "roc_auc"
+
+try:
+    from platform_config import EVIDENTLY_DRIFT_PROJECT_ID, EVIDENTLY_HARD_PROJECT_ID
+except ImportError:
+    import uuid as _uuid
+    _NS = _uuid.UUID("c9a1f9d4-6f1e-4b8a-9e5a-3f6a2b1c7d8e")
+    EVIDENTLY_DRIFT_PROJECT_ID = _uuid.uuid5(_NS, "credit-risk-data-drift")
+    EVIDENTLY_HARD_PROJECT_ID = _uuid.uuid5(_NS, "credit-risk-hard-metrics")
 
 # DB column name for each metric key
 _METRIC_DB_COL = {
@@ -78,7 +67,10 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MODEL_NAME        = os.getenv("MODEL_REGISTRY_NAME",   "credit-risk-classifier")
 
 MIN_ROC_AUC              = float(os.getenv("MIN_ROC_AUC",               0.51))
-MAX_DRIFT_FEATURE_FRACTION = float(os.getenv("MAX_DRIFT_FEATURE_FRACTION", 0.50))
+MAX_DRIFT_FEATURE_FRACTION = float(os.getenv("MAX_DRIFT_FEATURE_FRACTION", 0.30))
+
+# Evidently self-hosted UI - browser-facing URL (host port mapping, not the docker service name)
+EVIDENTLY_UI_URL = os.getenv("EVIDENTLY_UI_URL", "http://localhost:8000")
 
 POSTGRES_CONN = {
     "host":     os.getenv("POSTGRES_HOST",     "postgres"),
@@ -182,6 +174,17 @@ def _read_sql(query: str, params: dict | None = None) -> pd.DataFrame:
         return pd.read_sql(_sql(query), conn, params=params or {})
 
 
+def render_evidently_report(project_id, snapshot_id: str | None, height: int = 1000) -> None:
+    """Embed the run's report from the self-hosted Evidently UI (docker-compose service
+    'evidently-ui', port 8000) via iframe, with a fallback link in case framing is blocked."""
+    if not snapshot_id:
+        st.info("No Evidently snapshot recorded for this run.")
+        return
+    url = f"{EVIDENTLY_UI_URL}/projects/{project_id}/reports/{snapshot_id}"
+    st.link_button("Open in Evidently UI ↗", url)
+    components.iframe(url, height=height, scrolling=True)
+
+
 @st.cache_data(ttl=60)
 def get_drift_runs() -> list:
     try:
@@ -256,19 +259,6 @@ def get_drift_history(limit: int = 50) -> pd.DataFrame:
                FROM dwh_monitoring_drift.results
                ORDER BY run_index ASC LIMIT :limit""",
             {"limit": limit},
-        )
-    except Exception:
-        return pd.DataFrame()
-
-
-@st.cache_data(ttl=60)
-def get_raw_predictions(run_index: int) -> pd.DataFrame:
-    try:
-        return _read_sql(
-            """SELECT default_probability, default_flag_predicted, actual_default_flag
-               FROM dwh_history.prediction_ground_truth
-               WHERE run_index = :run_index AND actual_default_flag IS NOT NULL""",
-            {"run_index": run_index},
         )
     except Exception:
         return pd.DataFrame()
@@ -437,177 +427,6 @@ def _plotly_base(height: int = 320) -> dict:
         font=dict(family="Inter, system-ui, sans-serif", size=12),
         legend=dict(orientation="h", y=-0.22, x=0),
     )
-
-
-_HOME_OWNERSHIP_LABELS = {0: "RENT", 1: "MORTGAGE", 2: "OWN", 3: "OTHER"}
-
-def make_distribution_figure(feature: str, ref_series: pd.Series | None, curr_series: pd.Series) -> go.Figure:
-    ks_stat = None
-    if HAS_SCIPY and ref_series is not None and len(ref_series) > 0:
-        ks_stat, _ = ks_2samp(ref_series.dropna(), curr_series.dropna())
-
-    ks_label = f" · KS={ks_stat:.3f}" if ks_stat is not None else ""
-    drift_color = PALETTE["danger"] if (ks_stat or 0) > 0.2 else PALETTE["success"]
-
-    all_vals = pd.concat([s for s in [ref_series, curr_series] if s is not None and len(s) > 0])
-    is_discrete = all_vals.nunique() <= 15
-
-    fig = go.Figure()
-
-    if is_discrete:
-        all_cats = sorted(all_vals.dropna().unique())
-        if feature == "home_ownership_encoded":
-            labels = [_HOME_OWNERSHIP_LABELS.get(int(v), str(v)) for v in all_cats]
-        else:
-            labels = [str(v) for v in all_cats]
-
-        def _norm_counts(s):
-            vc = s.value_counts()
-            total = len(s)
-            return [(vc.get(v, 0) / total) for v in all_cats]
-
-        if ref_series is not None and len(ref_series) > 0:
-            fig.add_trace(go.Bar(
-                x=labels, y=_norm_counts(ref_series),
-                name="Reference", opacity=0.7,
-                marker_color=PALETTE["reference"],
-            ))
-        fig.add_trace(go.Bar(
-            x=labels, y=_norm_counts(curr_series),
-            name="Current", opacity=0.85,
-            marker_color=PALETTE["current"],
-        ))
-        fig.update_layout(
-            **_plotly_base(270),
-            title=dict(
-                text=f"<b>{feature}</b><span style='color:{drift_color};font-size:11px'>{ks_label}</span>",
-                font=dict(size=13),
-            ),
-            barmode="group",
-            xaxis_title=feature,
-            yaxis_title="Proportion",
-            xaxis=dict(type="category"),
-        )
-    else:
-        if ref_series is not None and len(ref_series) > 0:
-            fig.add_trace(go.Histogram(
-                x=ref_series, name="Reference", histnorm="probability density",
-                opacity=0.55, marker_color=PALETTE["reference"], nbinsx=30,
-            ))
-        fig.add_trace(go.Histogram(
-            x=curr_series, name="Current", histnorm="probability density",
-            opacity=0.65, marker_color=PALETTE["current"], nbinsx=30,
-        ))
-        fig.update_layout(
-            **_plotly_base(270),
-            title=dict(
-                text=f"<b>{feature}</b><span style='color:{drift_color};font-size:11px'>{ks_label}</span>",
-                font=dict(size=13),
-            ),
-            barmode="overlay",
-            xaxis_title=feature,
-            yaxis_title="Density",
-        )
-
-    return fig
-
-
-def make_confusion_matrix_fig(y_true: np.ndarray, y_pred: np.ndarray) -> go.Figure:
-    cm = confusion_matrix(y_true, y_pred)
-    labels = ["No Default", "Default"]
-    total  = cm.sum()
-    text   = [[f"{cm[i,j]}<br>({cm[i,j]/total*100:.1f}%)" for j in range(2)] for i in range(2)]
-
-    # Heatmap via plotly for consistent styling
-    fig = go.Figure(go.Heatmap(
-        z=cm,
-        x=[f"Pred: {l}" for l in labels],
-        y=[f"Actual: {l}" for l in labels],
-        text=text,
-        texttemplate="%{text}",
-        textfont=dict(size=15, color="white"),
-        colorscale=[[0, "#dbeafe"], [1, "#1d4ed8"]],
-        showscale=False,
-    ))
-    fig.update_layout(
-        **_plotly_base(340),
-        title=dict(text="<b>Confusion Matrix</b>", font=dict(size=14)),
-        yaxis=dict(autorange="reversed"),
-    )
-    return fig
-
-
-def make_roc_fig(y_true: np.ndarray, y_score: np.ndarray) -> go.Figure:
-    fpr, tpr, _ = roc_curve(y_true, y_score)
-    auc_val = roc_auc_score(y_true, y_score)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=fpr, y=tpr, mode="lines", name=f"ROC (AUC = {auc_val:.4f})",
-        line=dict(color=PALETTE["danger"], width=2.5),
-        fill="tozeroy", fillcolor="rgba(239,68,68,0.08)",
-    ))
-    fig.add_trace(go.Scatter(
-        x=[0, 1], y=[0, 1], mode="lines", name="No skill",
-        line=dict(color="#94a3b8", dash="dash", width=1.5),
-    ))
-    fig.update_layout(
-        **_plotly_base(340),
-        title=dict(text=f"<b>ROC Curve</b>  ·  AUC = {auc_val:.4f}", font=dict(size=14)),
-        xaxis_title="False Positive Rate",
-        yaxis_title="True Positive Rate",
-        xaxis=dict(range=[0, 1]),
-        yaxis=dict(range=[0, 1]),
-    )
-    return fig
-
-
-def make_pr_fig(y_true: np.ndarray, y_score: np.ndarray) -> go.Figure:
-    prec, rec, _ = precision_recall_curve(y_true, y_score)
-    ap       = average_precision_score(y_true, y_score)
-    baseline = float(y_true.mean())
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=rec, y=prec, mode="lines", name=f"PR (AP = {ap:.4f})",
-        line=dict(color=PALETTE["success"], width=2.5),
-        fill="tozeroy", fillcolor="rgba(34,197,94,0.08)",
-    ))
-    fig.add_hline(y=baseline, line_dash="dash", line_color="#94a3b8",
-                  annotation_text=f"Baseline ({baseline:.3f})")
-    fig.update_layout(
-        **_plotly_base(340),
-        title=dict(text=f"<b>Precision-Recall Curve</b>  ·  AP = {ap:.4f}", font=dict(size=14)),
-        xaxis_title="Recall",
-        yaxis_title="Precision",
-        xaxis=dict(range=[0, 1]),
-        yaxis=dict(range=[0, 1]),
-    )
-    return fig
-
-
-def make_calibration_fig(y_true: np.ndarray, y_score: np.ndarray) -> go.Figure:
-    fig = go.Figure()
-    if HAS_CALIBRATION:
-        frac_pos, mean_pred = calibration_curve(y_true, y_score, n_bins=10)
-        fig.add_trace(go.Scatter(
-            x=mean_pred, y=frac_pos, mode="lines+markers", name="Model",
-            line=dict(color=PALETTE["purple"], width=2.5),
-            marker=dict(size=8, symbol="square"),
-        ))
-    fig.add_trace(go.Scatter(
-        x=[0, 1], y=[0, 1], mode="lines", name="Perfect",
-        line=dict(color="#94a3b8", dash="dash", width=1.5),
-    ))
-    fig.update_layout(
-        **_plotly_base(340),
-        title=dict(text="<b>Calibration Plot</b>", font=dict(size=14)),
-        xaxis_title="Mean Predicted Probability",
-        yaxis_title="Fraction of Positives",
-        xaxis=dict(range=[0, 1]),
-        yaxis=dict(range=[0, 1]),
-    )
-    return fig
 
 
 def make_metric_trend_fig(hist: pd.DataFrame) -> go.Figure:
@@ -972,7 +791,7 @@ with tab_drift:
         else:
             st.warning("Could not load drift result for this run.")
 
-        # ── Feature distributions ────────────────────────────────────────────────
+        # ── Evidently drift report ────────────────────────────────────────────────
         with st.spinner("Loading feature distributions…"):
             curr_df = get_current_features(sel_drift_run)
             ref_df  = get_reference_features()
@@ -1000,25 +819,11 @@ with tab_drift:
                     rows.append(row)
                 st.dataframe(pd.DataFrame(rows).set_index("Feature"), width="stretch")
 
-            st.markdown("##### Feature Distribution Comparison")
-            st.caption(
-                f"Grey = Reference (training data, {len(ref_df):,} records)  ·  "
-                f"Orange = Current run (run {sel_drift_run}, {len(curr_df):,} records)  ·  "
-                "Normalized to probability density  ·  KS statistic shown in title"
-                if ref_df is not None else
-                f"Orange = Current run (run {sel_drift_run}, {len(curr_df):,} records)"
+            st.markdown("##### Feature Distribution Comparison (Evidently)")
+            render_evidently_report(
+                EVIDENTLY_DRIFT_PROJECT_ID,
+                result.get("evidently_snapshot_id") if result else None,
             )
-            feat_pairs = [FEATURE_COLUMNS[i:i+2] for i in range(0, len(FEATURE_COLUMNS), 2)]
-            for pair in feat_pairs:
-                cols = st.columns(2)
-                for ci, feat in enumerate(pair):
-                    if feat not in curr_df.columns:
-                        continue
-                    ref_s = ref_df[feat] if (ref_df is not None and feat in ref_df.columns) else None
-                    cols[ci].plotly_chart(
-                        make_distribution_figure(feat, ref_s, curr_df[feat]),
-                        width="stretch",
-                    )
         else:
             st.markdown(
                 '<div class="empty-state">No inference data for this run.<br>Run batch inference first.</div>',
@@ -1109,31 +914,12 @@ with tab_hard:
         else:
             st.warning("Could not load metrics for this run.")
 
-        # ── Charts ───────────────────────────────────────────────────────────────
-        raw_df = get_raw_predictions(sel_hard_run)
-        if raw_df.empty:
-            st.info(
-                "No raw prediction data for this run. "
-                "Ground truth is populated during batch inference - ensure the inference run completed."
-            )
-        else:
-            y_true  = raw_df["actual_default_flag"].values.astype(int)
-            y_pred  = raw_df["default_flag_predicted"].values.astype(int)
-            y_score = raw_df["default_probability"].values.astype(float)
-
-            # Row 1: Confusion Matrix | ROC
-            col_l, col_r = st.columns(2)
-            with col_l:
-                st.plotly_chart(make_confusion_matrix_fig(y_true, y_pred), width="stretch")
-            with col_r:
-                st.plotly_chart(make_roc_fig(y_true, y_score), width="stretch")
-
-            # Row 2: PR | Calibration
-            col_l2, col_r2 = st.columns(2)
-            with col_l2:
-                st.plotly_chart(make_pr_fig(y_true, y_score), width="stretch")
-            with col_r2:
-                st.plotly_chart(make_calibration_fig(y_true, y_score), width="stretch")
+        # ── Classification report (Evidently) ─────────────────────────────────────
+        st.markdown("##### Confusion Matrix · ROC · PR · Quality Metrics (Evidently)")
+        render_evidently_report(
+            EVIDENTLY_HARD_PROJECT_ID,
+            m.get("evidently_snapshot_id") if m else None,
+        )
 
         # ── Metric trends ─────────────────────────────────────────────────────────
         st.markdown("##### Metric Trends")

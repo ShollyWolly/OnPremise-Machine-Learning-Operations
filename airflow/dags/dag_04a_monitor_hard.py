@@ -48,6 +48,7 @@ DB_ENV = {
     "MODEL_REGISTRY_NAME": os.getenv("MODEL_REGISTRY_NAME", "credit-risk-classifier"),
     "DATA_MONITORING_HARD_PATH": "/data/monitoring/hard",
     "MIN_ROC_AUC": os.getenv("MIN_ROC_AUC", "0.70"),
+    "EVIDENTLY_WORKSPACE_PATH": os.getenv("EVIDENTLY_WORKSPACE_PATH", "/data/monitoring/evidently_workspace"),
 }
 
 

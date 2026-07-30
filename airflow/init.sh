@@ -2,8 +2,8 @@
 # =============================================================================
 # Platform Init Script
 # =============================================================================
-# Runs once at startup (via platform-init container).
-# Idempotent - safe to run on repeated docker compose up.
+# Invoked by ../setup.sh via `docker compose run --rm airflow-webserver bash
+# /opt/mlops/init.sh`. Idempotent - safe to run repeatedly.
 #
 # Steps:
 #   1. Migrate Airflow DB
@@ -80,9 +80,9 @@ airflow users create \
     2>&1 || echo "      User may already exist - continuing."
 
 # ---------------------------------------------------------------------------
-# 3. Volume permissions - handled by volume-init service (runs as root)
+# 3. Volume permissions - handled by setup.sh before this script runs
 # ---------------------------------------------------------------------------
-echo "[3/5] Volume permissions pre-set by volume-init - skipping."
+echo "[3/5] Volume permissions pre-set by setup.sh - skipping."
 
 # ---------------------------------------------------------------------------
 # 4. Wait for MLflow

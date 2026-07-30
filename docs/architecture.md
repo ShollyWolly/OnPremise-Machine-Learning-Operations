@@ -2,7 +2,7 @@
 
 ## Overview
 
-End-to-end MLOps platform for binary credit risk classification (loan default prediction). All components run in Docker containers on a shared `mlops-net` bridge network. Apache Airflow orchestrates all pipeline DAGs. Two Streamlit apps provide operational UIs. A containerized JupyterLab environment is pre-wired for prototyping and EDA.
+End-to-end MLOps platform for binary credit risk classification (loan default prediction). All components run in Docker containers on a shared `mlops-net` bridge network. Apache Airflow orchestrates all pipeline DAGs. Two Streamlit apps provide operational UIs, backed by a self-hosted Evidently UI for drift and classification reports. A containerized JupyterLab environment is pre-wired for prototyping and EDA.
 
 ---
 
@@ -26,6 +26,10 @@ End-to-end MLOps platform for binary credit risk classification (loan default pr
 │                                │ 03_production_model_...  │               │
 │                                └──────────────────────────┘               │
 └──────────────────────────────────────────────────────────────────────────┘
+Note: Data Drift / Hard Metrics tabs embed reports from the self-hosted
+Evidently UI (`evidently-ui` container, :8000), fed by a shared Workspace
+directory that `data_drift.py` / `hard_metrics.py` push snapshots to.
+
           │ trigger DAGs / read metrics          │ log experiments / read data
           ▼                                      ▼
 ┌─────────────────────┐              ┌───────────────────────┐
@@ -136,15 +140,15 @@ End-to-end MLOps platform for binary credit risk classification (loan default pr
 |---|---|---|---|
 | `mlops-postgres` | `postgres:15` | 5432 | All relational storage |
 | `mlops-mlflow` | `./infrastructure/mlflow` | 5000 | Tracking server + model registry + artifact store |
-| `mlops-platform-init` | `./airflow` | - | One-shot bootstrap: Airflow DB, admin user, initial model |
 | `mlops-airflow-webserver` | `./airflow` | 8080 | Airflow UI |
 | `mlops-airflow-scheduler` | `./airflow` | - | DAG scheduling |
 | `mlops-flask-api` | `./services/model_serving` | 5001 | Model serving endpoint (gunicorn + Flask) |
 | `mlops-streamlit-ui` | `./services/streamlit_ui` | 8501 | Control Panel |
 | `mlops-streamlit-dashboard` | `./services/streamlit_ui` | 8502 | Monitoring Dashboard |
+| `mlops-evidently-ui` | `./services/monitoring` (same image, overridden entrypoint) | 8000 | Self-hosted Evidently report viewer |
 | `mlops-jupyter` | `./infrastructure/jupyter` | 8888 | JupyterLab, EDA + challenger prototyping |
 
-Pipeline scripts (data_generator, processing_pipeline, batch_inference, monitoring modules) run as Airflow BashOperator tasks, they are NOT long-running services.
+Pipeline scripts (data_generator, processing_pipeline, batch_inference, monitoring modules) run as Airflow BashOperator tasks, they are NOT long-running services. Platform bootstrap (Airflow DB migration, admin user, initial model) runs via `./setup.sh` invoking `docker compose run` against `airflow/init.sh` - not a standing container.
 
 ---
 
@@ -215,9 +219,11 @@ No `staging` alias exists. The registry uses `production` alias + `stage` tag fo
 
 | Tab | Function |
 |---|---|
-| **Data Drift** | Feature distribution comparison (reference vs current). KS statistics per feature. Drift score trend. |
-| **Hard Metrics** | All 6 metric cards (★ primary metric highlighted). ROC, PR, calibration curves. Confusion matrix. Threshold sensitivity. Metric trend across runs. |
+| **Data Drift** | Summary cards, dataset statistics, drift score trend, embedded Evidently `DataDriftPreset` report (per-feature distribution comparison). |
+| **Hard Metrics** | All 6 metric cards (★ primary metric highlighted). Metric trend across runs. Embedded Evidently `ClassificationPreset` report (confusion matrix, ROC, PR, quality metrics). |
 | **Explainability** | SHAP beeswarm + mean |SHAP| bar chart. Customer waterfall: select customer_id to see per-feature contribution. |
+
+Reports are also browsable directly at the self-hosted **Evidently UI** (`http://localhost:8000`, projects `credit-risk-data-drift` / `credit-risk-hard-metrics`).
 
 ---
 
